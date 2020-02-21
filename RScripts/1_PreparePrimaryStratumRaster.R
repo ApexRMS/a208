@@ -22,7 +22,7 @@ Sys.setenv(TZ='GMT')
 options(stringsAsFactors=FALSE, SHAPE_RESTORE_SHX=T)
 
 # Directories
-gisBase <- "C:/OSGeo4W64/apps/grass/grass78"
+gisBase <- "C:/Program Files/GRASS GIS 7.4.3"
 gisDbase <- "E:/a208/Results/Spatial/grass7"
 spatialDataDir <- "E:/a208/Data/Spatial/"
 tabularDataDir <- "E:/a208/Data/Tabular/"
