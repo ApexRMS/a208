@@ -53,7 +53,7 @@ v.get.att <- function(vector_name){
   return(df)
 }
 
-#### Set up GRASS Location and GRASS Mapset #####
+#### Set up GRASS Mapset #####
 # Initiate GRASS in 'PreparePrimaryStratum' mapset
 initGRASS(gisBase=gisBase, gisDbase=gisDbase, location='a208', mapset='PreparePrimaryStratum')
 
@@ -61,3 +61,11 @@ initGRASS(gisBase=gisBase, gisDbase=gisDbase, location='a208', mapset='PreparePr
 execGRASS("g.mapset", mapset = "PrepareSecondaryStratum", flags="c")
 
 # Import data
+execGRASS("v.import", input=landOwner_name, output='rawData_landOwner')
+execGRASS("v.import", input=adminLands_name, output='rawData_landOwner')
+execGRASS("v.import", input=ecologicalReserve_name, output='rawData_landOwner')
+execGRASS("v.import", input=protectedArea_name, output='rawData_landOwner')
+execGRASS("v.import", input=provPark_name, output='rawData_landOwner')
+execGRASS("v.import", input=reserveLands_name, output='rawData_landOwner')
+execGRASS("v.import", input=WHA_name, output='rawData_landOwner')
+execGRASS("v.import", input=WMA_name, output='rawData_landOwner')
