@@ -160,4 +160,4 @@ execGRASS('g.remove', type='raster', name='LC2010_wetlands_inter', flags='f')
 execGRASS('r.patch', input=c('LC2010_wetlands_mask', 'BEC_ID'), output='primaryStratum', 'overwrite')
 
 # Export
-execGRASS('r.out.gdal', input='primaryStratum', output=paste0(resultsDir, 'DataLayers/PrimaryStratum.tif'))
+execGRASS('r.out.gdal', input='primaryStratum', output=paste0(resultsDir, 'Spatial/DataLayers/PrimaryStratum.tif'))
