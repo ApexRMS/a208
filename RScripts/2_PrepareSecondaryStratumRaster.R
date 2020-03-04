@@ -5,7 +5,11 @@
 
 ############################################################################################################################
 # This code:                                                                                                               #
-# 1. 
+# 1. Creates a PrepareSecondaryStratum GRASS mapset                                                                        #
+# 2. Imports all land ownership vectors to GRASS mapset                                                                    #
+# 3. Imports study region clipping mask to GRASS mapset                                                                    #
+# 4. Rasterizes all land ownership vectors                                                                                 #
+# 5. 
 ############################################################################################################################
 
 #### Workspace ####
@@ -29,13 +33,13 @@ canopyCoverThreshold <- 50 # Canopy cover value starting at which the canopy wil
 
 # Spatial data - Names
 landOwner_name <- paste0(spatialDataDir, "Land_Owner/Land_Owner.shp")
-adminLands_name <- paste0(spatialDataDir, "BC_AdminLands/BC_AdminLands.shp")
-ecologicalReserve_name <- paste0(spatialDataDir, "BC_EcologicalReserve/BC_EcologicalReserve.shp")
-protectedArea_name <- paste0(spatialDataDir, "BC_ProtectedArea/BC_ProtectedArea.shp")
-provPark_name <- paste0(spatialDataDir, "BC_ProvPark/BC_ProvPark.shp")
-reserveLands_name <- paste0(spatialDataDir, "BC_ReserveLands/BC_ReserveLands.shp")
-WHA_name <- paste0(spatialDataDir, "BC_WHA/BC_WHA.shp")
-WMA_name <- paste0(spatialDataDir, "BC_WHA/BC_WMA.shp")
+adminLands_name <- paste0(spatialDataDir, "BC_AdminLands/BC_AdminLands_Oct2019.shp")
+ecologicalReserve_name <- paste0(spatialDataDir, "BC_EcologicalReserve/BC_EcologicalReserve_Oct2019.shp")
+protectedArea_name <- paste0(spatialDataDir, "BC_ProtectedArea/BC_ProtectedArea_Oct2019.shp")
+provPark_name <- paste0(spatialDataDir, "BC_ProvPark/BC_ProvPark_Oct2019.shp")
+reserveLands_name <- paste0(spatialDataDir, "BC_ReserveLands/BC_ReserveLands_Oct2019.shp")
+WHA_name <- paste0(spatialDataDir, "BC_WHA/BC_WHA_Oct2018.shp")
+WMA_name <- paste0(spatialDataDir, "BC_WMA/BC_WMA_Oct2019.shp")
 
 # Tabular data - Load
 
@@ -61,11 +65,20 @@ initGRASS(gisBase=gisBase, gisDbase=gisDbase, location='a208', mapset='PreparePr
 execGRASS("g.mapset", mapset = "PrepareSecondaryStratum", flags="c")
 
 # Import data
-execGRASS("v.import", input=landOwner_name, output='rawData_landOwner')
-execGRASS("v.import", input=adminLands_name, output='rawData_landOwner')
-execGRASS("v.import", input=ecologicalReserve_name, output='rawData_landOwner')
-execGRASS("v.import", input=protectedArea_name, output='rawData_landOwner')
-execGRASS("v.import", input=provPark_name, output='rawData_landOwner')
-execGRASS("v.import", input=reserveLands_name, output='rawData_landOwner')
-execGRASS("v.import", input=WHA_name, output='rawData_landOwner')
-execGRASS("v.import", input=WMA_name, output='rawData_landOwner')
+      # From shapefiles
+execGRASS("v.import", input=landOwner_name, output='rawData_landOwner', 'overwrite')
+execGRASS("v.import", input=adminLands_name, output='rawData_adminLands', 'overwrite')
+execGRASS("v.import", input=ecologicalReserve_name, output='rawData_ecologicalReserve', 'overwrite')
+execGRASS("v.import", input=protectedArea_name, output='rawData_protectedArea', 'overwrite')
+execGRASS("v.import", input=provPark_name, output='rawData_provPark', 'overwrite')
+execGRASS("v.import", input=reserveLands_name, output='rawData_reserveLands', 'overwrite')
+execGRASS("v.import", input=WHA_name, output='rawData_WHA', 'overwrite')
+execGRASS("v.import", input=WMA_name, output='rawData_WMA', 'overwrite')
+
+      # From GRASS mapsets
+execGRASS('g.copy', raster=c('MASK@PreparePrimaryStratum' ,'MASK'))
+
+# Set mapset region
+execGRASS('g.region', zoom='MASK')
+
+#### Rasterize all input vectors - PICK UP HERE ####
