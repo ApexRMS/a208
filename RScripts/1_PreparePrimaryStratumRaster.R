@@ -135,14 +135,14 @@ rule <- paste('CASE', paste(paste('WHEN Name =', sQuote(subzoneID$Name), 'THEN',
 execGRASS('v.db.update', map='rawData_VRI', column='ID', query_column=rule)
 
 #### Format VRI - Rasterize ####
-execGRASS('v.to.rast', input='rawData_VRI', output='primaryStratum', use='attr', attribute_column='ID', label_column='Name', 'overwrite')
+execGRASS('v.to.rast', input='rawData_VRI', output='BEC_ID', use='attr', attribute_column='ID', label_column='Name', 'overwrite')
 
 #### Apply Clipping Mask  ####
 # Set region to that of VRI
-execGRASS('g.region', zoom='primaryStratum')
+execGRASS('g.region', zoom='BEC_ID')
 
 # Produce clipping mask
-execGRASS('r.mask', raster='primaryStratum', 'overwrite')
+execGRASS('r.mask', raster='BEC_ID', 'overwrite')
 
 # Clip all layers to clipping mask
 execGRASS('r.mapcalc', expression='LC1990_agg_mask = LC1990_agg')
@@ -156,10 +156,8 @@ execGRASS('r.reclass', input='LC2010_agg_mask', output='LC2010_wetlands_inter', 
 execGRASS('r.mapcalc', expression='LC2010_wetlands_mask = LC2010_wetlands_inter', region='current', flags='overwrite')
 execGRASS('g.remove', type='raster', name='LC2010_wetlands_inter', flags='f')
 
-# Overlay wetlands on the primaryStratum raster
-execGRASS('r.patch', input=c('LC2010_wetlands_mask', 'primaryStratum'), output='primaryStratum_inter', 'overwrite')
-execGRASS('r.mapcalc', expression='primaryStratum = primaryStratum_inter', region='current', flags='overwrite')
-execGRASS('g.remove', type='raster', name='primaryStratum_inter', flags='f')
+# Overlay wetlands on the BEC_ID raster
+execGRASS('r.patch', input=c('LC2010_wetlands_mask', 'BEC_ID'), output='primaryStratum', 'overwrite')
 
 # Export
 execGRASS('r.out.gdal', input='primaryStratum', output=paste0(resultsDir, 'DataLayers/PrimaryStratum.tif'))
