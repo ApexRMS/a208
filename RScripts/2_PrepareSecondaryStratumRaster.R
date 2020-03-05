@@ -9,7 +9,7 @@
 # 2. Imports all land ownership vectors to GRASS mapset                                                                    #
 # 3. Imports study region clipping mask to GRASS mapset                                                                    #
 # 4. Rasterizes all land ownership vectors                                                                                 #
-# 5. 
+# 5. Produces the Secondary Stratum raster from land ownership rasters                                                     #
 ############################################################################################################################
 
 #### Workspace ####
