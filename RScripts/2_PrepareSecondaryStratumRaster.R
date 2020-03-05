@@ -17,6 +17,7 @@
 library(rgrass7)
 library(tidyverse)
 library(stringr)
+library(openxlsx)
 
 # Settings
 Sys.setenv(TZ='GMT')
@@ -43,6 +44,7 @@ WHA_name <- paste0(spatialDataDir, "BC_WHA/BC_WHA_Oct2018.shp")
 WMA_name <- paste0(spatialDataDir, "BC_WMA/BC_WMA_Oct2019.shp")
 
 # Tabular data - Load
+secondaryStratumID <- read.xlsx(paste0(tabularDataDir, 'SecondaryStratumID.xlsx'))
 
 # Function - Get GRASS vector attribute table
 v.get.att <- function(vector_name, sep){
@@ -179,3 +181,21 @@ execGRASS('v.to.rast', input='rawData_WMA', output='WMA_mask_inter', use='attr',
 execGRASS('r.mapcalc', expression='WMA_mask = if(WMA_mask_inter)', 'overwrite')
 execGRASS('g.remove', type='raster', name='WMA_mask_inter', 'f')
 
+#### Produce Secondary Stratum raster ####
+# Create raster with Secondary Stratum ID = 1
+execGRASS('r.patch', input=c('adminLands_mask', 'ecologicalReserve_mask', 'protectedArea_mask', 'provPark_mask', 'reserveLands_mask', 'WHA_mask', 'WMA_mask'), output='secondaryStratum1')
+
+# Create raster with Secondary Stratum ID = 2
+write.table(c('8=2', '6=2', '4=2', '*=NULL'), paste0(resultsDir, 'Tabular/Rules/LandOwner_getPrivate.txt'), sep="", col.names=FALSE, quote=FALSE, row.names=FALSE)
+execGRASS('r.reclass', input='landOwner_mask', output='secondaryStratum2_inter', rules=paste0(resultsDir, 'Tabular/Rules/LandOwner_getPrivate.txt'))
+execGRASS('r.mapcalc', expression='secondaryStratum2 = secondaryStratum2_inter', 'overwrite')
+execGRASS('g.remove', type='raster', name='secondaryStratum2_inter', 'f')
+
+# Create raster with Secondary Stratum ID = 3
+execGRASS('r.mapcalc', expression='secondaryStratum3 = if(MASK, 3)')
+
+# Compile into secondary stratum raster
+execGRASS('r.patch', input=c('secondaryStratum1', 'secondaryStratum2', 'secondaryStratum3'), output='secondaryStratum', 'overwrite')
+
+# Export
+execGRASS('r.out.gdal', input='secondaryStratum', output=paste0(resultsDir, 'Spatial/DataLayers/SecondaryStratum.tif'))
