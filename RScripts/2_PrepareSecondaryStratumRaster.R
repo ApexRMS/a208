@@ -45,13 +45,13 @@ WMA_name <- paste0(spatialDataDir, "BC_WMA/BC_WMA_Oct2019.shp")
 # Tabular data - Load
 
 # Function - Get GRASS vector attribute table
-v.get.att <- function(vector_name){
+v.get.att <- function(vector_name, sep){
   # Get attributes
-  att <- execGRASS("v.db.select", map=vector_name, separator=':', intern=T)
+  att <- execGRASS("v.db.select", map=vector_name, separator=sep, intern=T)
   
   # Format as dataframe
   tc <- textConnection(att)
-  df <- read.table(tc, header = TRUE, sep=':')
+  df <- read.table(tc, header = TRUE, sep=sep)
   close(tc)
   
   # Return resulting dataframe
@@ -98,9 +98,15 @@ res_col <- execGRASS('r.info', map='MASK', intern=T)[res_row] %>%
 res <- execGRASS('r.info', map='MASK', intern=T)[res_row] %>%
   substr(., start=res_col, stop=res_col+10) %>%
   as.integer(.)
-  
+rm(res_row, res_col)
+
       # Apply to region
 execGRASS('g.region', zoom='MASK', res=as.character(res))
 
 #### Rasterize all input vectors ####
-execGRASS('')
+# Land owner
+      # Create land ownership key
+landOwner_att <- v.get.att(vector_name='rawData_landOwner', sep='&')
+
+
+execGRASS('v.to.rast', input='rawData_landOwner', output='landOwner_mask', use='attr', attribute_column='OWNER_TYPE')

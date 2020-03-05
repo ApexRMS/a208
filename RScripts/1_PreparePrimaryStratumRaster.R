@@ -47,13 +47,13 @@ subzoneID <- read.xlsx(paste0(tabularDataDir, "BEC Subzone.xlsx"), sheet="Stratu
   mutate(Name = ifelse(Name == 'SBSwc', 'SBSwk', ifelse(Name == 'ESSFmv2', 'ESSFmv', ifelse(Name == 'BWBSwk1', 'BWBSwk', Name)))) # Correct errors in .xlsx file
 
 # Function - Get GRASS vector attribute table
-v.get.att <- function(vector_name){
+v.get.att <- function(vector_name, sep){
   # Get attributes
-  att <- execGRASS("v.db.select", map=vector_name, separator=':', intern=T)
+  att <- execGRASS("v.db.select", map=vector_name, separator=sep, intern=T)
   
   # Format as dataframe
   tc <- textConnection(att)
-  df <- read.table(tc, header = TRUE, sep=':')
+  df <- read.table(tc, header = TRUE, sep=sep)
   close(tc)
   
   # Return resulting dataframe
