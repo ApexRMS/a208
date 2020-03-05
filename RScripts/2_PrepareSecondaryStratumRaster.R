@@ -197,5 +197,9 @@ execGRASS('r.mapcalc', expression='secondaryStratum3 = if(MASK, 3)')
 # Compile into secondary stratum raster
 execGRASS('r.patch', input=c('secondaryStratum1', 'secondaryStratum2', 'secondaryStratum3'), output='secondaryStratum', 'overwrite')
 
+# Remove unused category values
+execGRASS('r.category', map='secondaryStratum', rules='-')
+execGRASS('r.colors', map='secondaryStratum', 'r')
+
 # Export
-execGRASS('r.out.gdal', input='secondaryStratum', output=paste0(resultsDir, 'Spatial/DataLayers/SecondaryStratum.tif'))
+execGRASS('r.out.gdal', input='secondaryStratum', output=paste0(resultsDir, 'Spatial/DataLayers/SecondaryStratum.tif'), 'overwrite')
