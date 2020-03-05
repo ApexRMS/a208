@@ -16,6 +16,7 @@
 # Packages
 library(rgrass7)
 library(tidyverse)
+library(stringr)
 
 # Settings
 Sys.setenv(TZ='GMT')
@@ -79,6 +80,27 @@ execGRASS("v.import", input=WMA_name, output='rawData_WMA', 'overwrite')
 execGRASS('g.copy', raster=c('MASK@PreparePrimaryStratum' ,'MASK'))
 
 # Set mapset region
-execGRASS('g.region', zoom='MASK')
+      # Get MASK resolution
+            # Get row where resolution is displayed in r.info output
+res_row <- execGRASS('r.info', map='MASK', intern=T) %>%
+  str_locate_all(., 'Res:    ') %>%
+  sapply(., nrow) %>%
+  match(1, .)
+  
+            # Get starting column where resolution is displayed in r.info output
+res_col <- execGRASS('r.info', map='MASK', intern=T)[res_row] %>%
+  str_locate_all(., 'Res:    ') %>%
+  .[[1]] %>%
+  .[1,2] %>%
+  as.integer(.) + 1
+  
+            # Get resolution
+res <- execGRASS('r.info', map='MASK', intern=T)[res_row] %>%
+  substr(., start=res_col, stop=res_col+10) %>%
+  as.integer(.)
+  
+      # Apply to region
+execGRASS('g.region', zoom='MASK', res=as.character(res))
 
-#### Rasterize all input vectors - PICK UP HERE ####
+#### Rasterize all input vectors ####
+execGRASS('')
