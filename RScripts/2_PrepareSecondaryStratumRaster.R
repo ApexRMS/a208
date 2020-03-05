@@ -194,8 +194,9 @@ execGRASS('r.mapcalc', expression='secondaryStratum3 = if(MASK, 3)')
 # Compile into secondary stratum raster
 execGRASS('r.patch', input=c('secondaryStratum1', 'secondaryStratum2', 'secondaryStratum3'), output='secondaryStratum', 'overwrite')
 
-# Remove unused category values
-execGRASS('r.category', map='secondaryStratum', rules='-')
+# Add category labels
+write.table(paste(secondaryStratumID$Secondary.Stratum.ID, secondaryStratumID$Name, sep=":"), paste0(resultsDir, 'Tabular/Rules/SecondaryStratum_getLabels.txt'), sep="", col.names=FALSE, quote=FALSE, row.names=FALSE)
+execGRASS('r.category', map='secondaryStratum', rules=paste0(resultsDir, 'Tabular/Rules/SecondaryStratum_getLabels.txt'), separator=":")
 execGRASS('r.colors', map='secondaryStratum', 'r')
 
 # Export
