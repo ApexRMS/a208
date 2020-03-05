@@ -30,9 +30,6 @@ spatialDataDir <- "E:/a208/Data/Spatial/"
 tabularDataDir <- "E:/a208/Data/Tabular/"
 resultsDir <- "E:/a208/Results/"
 
-# Input Parameters
-canopyCoverThreshold <- 50 # Canopy cover value starting at which the canopy will be considered "closed" (otherwise considered "open"), in %
-
 # Spatial data - Names
 landOwner_name <- paste0(spatialDataDir, "Land_Owner/Land_Owner.shp")
 adminLands_name <- paste0(spatialDataDir, "BC_AdminLands/BC_AdminLands_Oct2019.shp")
