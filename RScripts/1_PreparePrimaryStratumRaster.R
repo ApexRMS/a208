@@ -45,6 +45,7 @@ LC2010_name <- paste0(spatialDataDir, "Land_Cover/IMG_AAFC_LANDUSE_Z10_2010/IMG_
 # Tabular data - Load
 subzoneID <- read.xlsx(paste0(tabularDataDir, "BEC Subzone.xlsx"), sheet="Stratum") %>% # Load
   mutate(Name = ifelse(Name == 'SBSwc', 'SBSwk', ifelse(Name == 'ESSFmv2', 'ESSFmv', ifelse(Name == 'BWBSwk1', 'BWBSwk', Name)))) # Correct errors in .xlsx file
+landCoverLabels <- read.xlsx(paste0(tabularDataDir, 'LANDCOVER_Labels.xlsx'))
 
 # Function - Get GRASS vector attribute table
 v.get.att <- function(vector_name, sep){
@@ -75,6 +76,12 @@ execGRASS("r.import", input=LC1990_name, output='rawData_LC1990', 'overwrite')
 execGRASS("r.import", input=LC2000_name, output='rawData_LC2000', 'overwrite')
 execGRASS("r.import", input=LC2010_name, output='rawData_LC2010', 'overwrite')
 execGRASS("v.import", input=VRI_name, output='rawData_VRI', snap=1e-005)
+
+# Add category labels
+write.table(paste(landCoverLabels$Code, landCoverLabels$Label, sep=":"), paste0(resultsDir, 'Tabular/Rules/LANDCOVER_getLabels.txt'), sep="", col.names=FALSE, quote=FALSE, row.names=FALSE)
+execGRASS('r.category', map='rawData_LC1990', rules=paste0(resultsDir, 'Tabular/Rules/LANDCOVER_getLabels.txt'), separator=":")
+execGRASS('r.category', map='rawData_LC2000', rules=paste0(resultsDir, 'Tabular/Rules/LANDCOVER_getLabels.txt'), separator=":")
+execGRASS('r.category', map='rawData_LC2010', rules=paste0(resultsDir, 'Tabular/Rules/LANDCOVER_getLabels.txt'), separator=":")
 
 # Set mapset region to the extent of the LANDCOVER data, with resolution = res
       # Set to minimum region encompassing LANDCOVER
@@ -112,9 +119,24 @@ execGRASS('g.region', n=as.character(nBound), e=as.character(eBound))
 execGRASS('g.region', res=as.character(res))
 
 # Aggregate LANDCOVER data to desired resolution
-execGRASS('r.resamp.stats', input='rawData_LC1990', output='LC1990_agg', method='mode', 'overwrite')
-execGRASS('r.resamp.stats', input='rawData_LC2000', output='LC2000_agg', method='mode', 'overwrite')
-execGRASS('r.resamp.stats', input='rawData_LC2010', output='LC2010_agg', method='mode', 'overwrite')
+execGRASS('r.resamp.stats', input='rawData_LC1990', output='LC1990_agg_int', method='mode', 'overwrite')
+execGRASS('r.resamp.stats', input='rawData_LC2000', output='LC2000_agg_int', method='mode', 'overwrite')
+execGRASS('r.resamp.stats', input='rawData_LC2010', output='LC2010_agg_int', method='mode', 'overwrite')
+
+# Specify that resulting rasters are integer rasters
+execGRASS('r.mapcalc', expression='LC1990_agg=int(LC1990_agg_int)', 'overwrite')
+execGRASS('r.mapcalc', expression='LC2000_agg=int(LC2000_agg_int)', 'overwrite')
+execGRASS('r.mapcalc', expression='LC2010_agg=int(LC2010_agg_int)', 'overwrite')
+
+# Remove intermediate rasters
+execGRASS('g.remove', type='raster', name='LC1990_agg_int', 'f')
+execGRASS('g.remove', type='raster', name='LC2000_agg_int', 'f')
+execGRASS('g.remove', type='raster', name='LC2010_agg_int', 'f')
+
+# Add category labels
+execGRASS('r.category', map='LC1990_agg', rules=paste0(resultsDir, 'Tabular/Rules/LANDCOVER_getLabels.txt'), separator=":")
+execGRASS('r.category', map='LC2000_agg', rules=paste0(resultsDir, 'Tabular/Rules/LANDCOVER_getLabels.txt'), separator=":")
+execGRASS('r.category', map='LC2010_agg', rules=paste0(resultsDir, 'Tabular/Rules/LANDCOVER_getLabels.txt'), separator=":")
 
 #### Format VRI - Add unique ID column ####
 # Stratum Name
@@ -159,5 +181,9 @@ execGRASS('g.remove', type='raster', name='LC2010_wetlands_inter', flags='f')
 # Overlay wetlands on the BEC_ID raster
 execGRASS('r.patch', input=c('LC2010_wetlands_mask', 'BEC_ID'), output='primaryStratum', 'overwrite')
 
+# Add category labels
+write.table(paste(subzoneID$ID, subzoneID$Name, sep=":"), paste0(resultsDir, 'Tabular/Rules/PrimaryStratum_getLabels.txt'), sep="", col.names=FALSE, quote=FALSE, row.names=FALSE)
+execGRASS('r.category', map='primaryStratum', rules=paste0(resultsDir, 'Tabular/Rules/PrimaryStratum_getLabels.txt'), separator=":")
+
 # Export
-execGRASS('r.out.gdal', input='primaryStratum', output=paste0(resultsDir, 'Spatial/DataLayers/PrimaryStratum.tif'))
+execGRASS('r.out.gdal', input='primaryStratum', output=paste0(resultsDir, 'Spatial/DataLayers/PrimaryStratum.tif'), 'overwrite')
