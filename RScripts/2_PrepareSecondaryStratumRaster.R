@@ -107,6 +107,75 @@ execGRASS('g.region', zoom='MASK', res=as.character(res))
 # Land owner
       # Create land ownership key
 landOwner_att <- v.get.att(vector_name='rawData_landOwner', sep='&')
+landOwner_key <- data.frame(Code = 1:length(unique(landOwner_att$OWNER_TYPE)),
+                            Label = sort(unique(landOwner_att$OWNER_TYPE)))
 
+      # Add land ownership key to attribute table
+            # Add column 
+execGRASS('v.db.addcolumn', map='rawData_landOwner', layer='1', columns='Code integer')
 
-execGRASS('v.to.rast', input='rawData_landOwner', output='landOwner_mask', use='attr', attribute_column='OWNER_TYPE')
+            # Create sqlite statement
+rule <- paste('CASE', paste(paste('WHEN OWNER_TYPE =', sQuote(landOwner_key$Label), 'THEN', landOwner_key$Code), collapse=" "), 'END')
+
+            # Populate column
+execGRASS('v.db.update', map='rawData_landOwner', column='Code', query_column=rule)
+
+      # Rasterize on land ownership key
+execGRASS('v.to.rast', input='rawData_landOwner', output='landOwner_mask', use='attr', attribute_column='Code', label_column='OWNER_TYPE')
+
+# Admin Lands
+      # Rasterize
+execGRASS('v.to.rast', input='rawData_adminLands', output='adminLands_mask_inter', use='attr', attribute_column='cat')
+
+      # Set all cells to 1
+execGRASS('r.mapcalc', expression='adminLands_mask = if(adminLands_mask_inter)', 'overwrite')
+execGRASS('g.remove', type='raster', name='adminLands_mask_inter', 'f')
+
+# Ecological Reserve
+      # Rasterize
+execGRASS('v.to.rast', input='rawData_ecologicalReserve', output='ecologicalReserve_mask_inter', use='attr', attribute_column='cat')
+
+      # Set all cells to 1
+execGRASS('r.mapcalc', expression='ecologicalReserve_mask = if(ecologicalReserve_mask_inter)', 'overwrite')
+execGRASS('g.remove', type='raster', name='ecologicalReserve_mask_inter', 'f')
+
+# Protected Area
+      # Rasterize
+execGRASS('v.to.rast', input='rawData_protectedArea', output='protectedArea_mask_inter', use='attr', attribute_column='cat')
+
+      # Set all cells to 1
+execGRASS('r.mapcalc', expression='protectedArea_mask = if(protectedArea_mask_inter)', 'overwrite')
+execGRASS('g.remove', type='raster', name='protectedArea_mask_inter', 'f')
+
+# Prov Park
+      # Rasterize
+execGRASS('v.to.rast', input='rawData_provPark', output='provPark_mask_inter', use='attr', attribute_column='cat')
+
+      # Set all cells to 1
+execGRASS('r.mapcalc', expression='provPark_mask = if(provPark_mask_inter)', 'overwrite')
+execGRASS('g.remove', type='raster', name='provPark_mask_inter', 'f')
+
+# Reserve Lands
+      # Rasterize
+execGRASS('v.to.rast', input='rawData_reserveLands', output='reserveLands_mask_inter', use='attr', attribute_column='cat')
+
+      # Set all cells to 1
+execGRASS('r.mapcalc', expression='reserveLands_mask = if(reserveLands_mask_inter)', 'overwrite')
+execGRASS('g.remove', type='raster', name='reserveLands_mask_inter', 'f')
+
+# WHA
+      # Rasterize
+execGRASS('v.to.rast', input='rawData_WHA', output='WHA_mask_inter', use='attr', attribute_column='cat')
+
+      # Set all cells to 1
+execGRASS('r.mapcalc', expression='WHA_mask = if(WHA_mask_inter)', 'overwrite')
+execGRASS('g.remove', type='raster', name='WHA_mask_inter', 'f')
+
+# WMA
+      # Rasterize
+execGRASS('v.to.rast', input='rawData_WMA', output='WMA_mask_inter', use='attr', attribute_column='cat')
+
+      # Set all cells to 1
+execGRASS('r.mapcalc', expression='WMA_mask = if(WMA_mask_inter)', 'overwrite')
+execGRASS('g.remove', type='raster', name='WMA_mask_inter', 'f')
+
