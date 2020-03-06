@@ -33,9 +33,6 @@ spatialDataDir <- "E:/a208/Data/Spatial/"
 tabularDataDir <- "E:/a208/Data/Tabular/"
 resultsDir <- "E:/a208/Results/"
 
-# Input Parameters
-canopyCoverThreshold <- 50 # Canopy cover value starting at which the canopy will be considered "closed" (otherwise considered "open"), in %
-
 # Spatial data - Names
 MPB_name <- paste0(spatialDataDir, "MPB/MPB.shp")
 CUTBLOCKS_name <- paste0(spatialDataDir, "CUTBLOCKS/CUTBLOCKS.shp")
