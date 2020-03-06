@@ -97,9 +97,9 @@ execGRASS('g.region', zoom='MASK', res=as.character(res))
 
 #### Input 1 - Get broad Land Cover from AAFC 2010 LANDCOVER layer ####
 write.table(c('21=2', '25=2', '31=3', '41=4', '42=4', '45=4', '46=4', '51=5', '61=6', '61=6', '71=7', '73=7', '74=7', '91=9'), paste0(resultsDir, 'Tabular/Rules/StateClass_getBroadLandCover.txt'), sep="", col.names=FALSE, quote=FALSE, row.names=FALSE)
-execGRASS('r.reclass', input='LC2010_agg_mask', output='stateClass_broad_inter', rules=paste0(resultsDir, 'Tabular/Rules/StateClass_getBroadLandCover.txt'), flags=c('overwrite'))
-execGRASS('r.mapcalc', expression='stateClass_broad = stateClass_broad_inter', region='current', flags='overwrite')
-execGRASS('g.remove', type='raster', name='stateClass_broad_inter', flags='f')
+execGRASS('r.reclass', input='LC2010_agg_mask', output='LC2010_broad_mask_inter', rules=paste0(resultsDir, 'Tabular/Rules/StateClass_getBroadLandCover.txt'), flags=c('overwrite'))
+execGRASS('r.mapcalc', expression='LC2010_broad_mask = LC2010_broad_mask_inter', region='current', flags='overwrite')
+execGRASS('g.remove', type='raster', name='LC2010_broad_mask_inter', flags='f')
 
 #### Input 2 - Distinguish between Pine and Other Forest using VRI ####
 # Add binary Pine/Other Forest column
@@ -113,17 +113,25 @@ rule <- paste('CASE WHEN (SPECIES_CD =', sQuote('PL'), 'OR SPECIES_CD =', sQuote
 execGRASS('v.db.update', map='rawData_VRI', column='Pine', query_column=rule)
 
 # Rasterize
-execGRASS('v.to.rast', input='rawData_VRI', output='Pine_Other', use='attr', attribute_column='Pine', 'overwrite')
+execGRASS('v.to.rast', input='rawData_VRI', output='Pine_mask', use='attr', attribute_column='Pine', 'overwrite')
 
-#### Input 3 - Identify areas that experienced MPB or clearcuts -- PICK UP HERE ####
-# Identify areas that experienced MPB
+#### Input 3 - Identify areas that experienced MPB ####
+# Get areas with Moderate, Severe, or Very Severe MPB
+execGRASS('v.extract', input='rawData_MPB', where="(PST_SEV_CD = 'M') OR (PST_SEV_CD = 'S') OR (PST_SEV_CD = 'V')", output='MPBimpacted')
 
+# Rasterize
+execGRASS('v.to.rast', input='MPBimpacted', output='MPB_mask_inter', use='attr', attribute_column='cat', 'overwrite')
+execGRASS('r.mapcalc', expression='MPB_mask = if(MPB_mask_inter)', 'overwrite')
+execGRASS('g.remove', type='raster', name='MPB_mask_inter', 'f')
 
-# Identify areas that experienced clearcuts
-
+#### Input 4 - Identify areas that experienced clearcuts ####
+execGRASS('v.to.rast', input='rawData_CUTBLOCKS', output='CUT_mask_inter', use='attr', attribute_column='cat', 'overwrite')
+execGRASS('r.mapcalc', expression='CUT_mask = if(CUT_mask_inter)', 'overwrite')
+execGRASS('g.remove', type='raster', name='CUT_mask_inter', 'f')
 
 #### Produce State Class raster ####
-# Combine all 3 inputs to produce State Class raster
+# Combine all 4 inputs to produce State Class raster
+
 
 # Export
 execGRASS('r.out.gdal', input='stateClass', output=paste0(resultsDir, 'Spatial/DataLayers/StateClass.tif'), 'overwrite')
