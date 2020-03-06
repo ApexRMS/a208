@@ -130,8 +130,15 @@ execGRASS('r.mapcalc', expression='CUT_mask = if(CUT_mask_inter)', 'overwrite')
 execGRASS('g.remove', type='raster', name='CUT_mask_inter', 'f')
 
 #### Produce State Class raster ####
-# Combine all 4 inputs to produce State Class raster
+# Produce forest classification
+execGRASS('r.mapcalc', expression='Forest_mask = if(LC2010_broad_mask == 4, if(Pine_mask == 1, if(not(isnull(CUT_mask)), 12, if(not(isnull(MPB_mask)), 11, 10)), if(not(isnull(CUT_mask)), 14, 13)), null())', 'overwrite')
 
+# Add to broad Land Cover classification
+execGRASS('r.patch', input=c('Forest_Mask', 'LC2010_broad_mask'), output='stateClass')
+
+# Add category labels
+write.table(paste(stateClassID$State.Class.ID, stateClassID$State.Class.Name, sep=";"), paste0(resultsDir, 'Tabular/Rules/StateClass_getLabels.txt'), sep="", col.names=FALSE, quote=FALSE, row.names=FALSE)
+execGRASS('r.category', map='stateClass', rules=paste0(resultsDir, 'Tabular/Rules/StateClass_getLabels.txt'), separator=";")
 
 # Export
 execGRASS('r.out.gdal', input='stateClass', output=paste0(resultsDir, 'Spatial/DataLayers/StateClass.tif'), 'overwrite')
