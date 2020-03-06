@@ -8,7 +8,11 @@
 # 1. Creates a PrepareStateClass GRASS mapset                                                                              #
 # 2. Imports 1990 LANDCOVER raster, VRI, MPB, and CUTBLOCKS data to GRASS mapset                                           #
 # 3. Imports study region clipping mask to GRASS mapset                                                                    #
-# 4. 
+# 4. Produces a raster of broad Land Cover from AAFC 2010 LANDCOVER layer (Input 1)                                        #
+# 5. Produces a raster of Pine vs. Other Forest from the VRI (Input 2)                                                     #
+# 6. Produces a raster of MPB-impacted areas (Input 3)                                                                     #
+# 7. Produces a raster of clearcut areas (Input 4)                                                                         #
+# 8. Combines all four inputs to produce the State Class raster                                                            #
 ############################################################################################################################
 
 #### Workspace ####
