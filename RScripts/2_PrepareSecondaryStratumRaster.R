@@ -100,6 +100,7 @@ res <- execGRASS('r.info', map='MASK', intern=T)[res_row] %>%
 rm(res_row, res_col)
 
       # Apply to region
+execGRASS('g.region', raster='MASK', res=as.character(res))
 execGRASS('g.region', zoom='MASK', res=as.character(res))
 
 #### Rasterize all input vectors ####
