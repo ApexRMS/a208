@@ -55,7 +55,7 @@ v.get.att <- function(vector_name, sep){
 }
 
 #### Set up GRASS Mapset #####
-# Initiate GRASS in 'PreparePrimaryStratum' mapset
+# Initiate GRASS in 'PrepareSecondaryStratum' mapset
 initGRASS(gisBase=gisBase, gisDbase=gisDbase, location='a208', mapset='PrepareSecondaryStratum')
 
 # Initialize new mapset inheriting projection info
