@@ -5,7 +5,10 @@
 
 ############################################################################################################################
 # This code:                                                                                                               #
-#
+# 1. Creates a PrepareForestAge GRASS mapset                                                                               #
+# 2. Imports VRI and CUTBLOCKS data to GRASS mapset                                                                        #
+# 3. Imports study region clipping mask to GRASS mapset                                                                    #
+# 4. Prepares Forest Age raster                                                                                            #
 ############################################################################################################################
 
 #### Workspace ####
@@ -75,8 +78,19 @@ rm(res_row, res_col)
 execGRASS('g.region', raster='MASK', res=as.character(res))
 execGRASS('g.region', zoom='MASK', res=as.character(res))
 
-#### Prepare FOrest Age raster ####
+#### Prepare Forest Age raster ####
+# Input 1: Clearcut ages
+      # Harvest year
+execGRASS('v.to.rast', input='rawData_CUTBLOCKS', output='CutYear_mask', use='attr', attribute_column='HARVEST_YE', 'overwrite')
 
+      # Age
+execGRASS('r.mapcalc', expression='CutAge_mask = 2018 - CutYear_mask', 'overwrite')
+
+# Input 2: Forest ages
+execGRASS('v.to.rast', input='rawData_VRI', output='VRIAge_mask', use='attr', attribute_column='PROJ_AGE_1', 'overwrite')
+
+# Combine both input rasters
+execGRASS('r.patch', input=c('CutAge_mask', 'VRIAge_mask'), output='forestAge')
 
 # Export
 execGRASS('r.out.gdal', input='forestAge', output=paste0(resultsDir, 'Spatial/DataLayers/ForestAge.tif'), 'overwrite')
