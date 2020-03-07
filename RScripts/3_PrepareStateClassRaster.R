@@ -21,10 +21,14 @@ library(rgrass7)
 library(tidyverse)
 library(stringr)
 library(openxlsx)
+library(magrittr)
 
 # Settings
 Sys.setenv(TZ='GMT')
 options(stringsAsFactors=FALSE, SHAPE_RESTORE_SHX=T, useFancyQuotes = F, digits=10)
+
+# Input parameters
+pineThreshold <- 10 # Percentage of trees required to be pine for the cell to be classified as pine
 
 # Directories
 gisBase <- "C:/Program Files/GRASS GIS 7.4.3"
@@ -103,14 +107,45 @@ execGRASS('r.mapcalc', expression='LC2010_broad_mask = LC2010_broad_mask_inter',
 execGRASS('g.remove', type='raster', name='LC2010_broad_mask_inter', flags='f')
 
 #### Input 2 - Distinguish between Pine and Other Forest using VRI ####
-# Add binary Pine/Other Forest column
-      # Add column
+# Species 1-6: Compute percentage of pine per species
+      # Species 1: Percentage of pine
+execGRASS('v.db.addcolumn', map='rawData_VRI', layer='1', columns='PinePC1 double precision')
+rule <- "CASE WHEN ((SPECIES_CD = 'PL') OR (SPECIES_CD = 'PLI')) THEN SPECIES_PC ELSE 0 END"
+execGRASS('v.db.update', map='rawData_VRI', column='PinePC1', query_column=rule)
+
+      # Species 2: Percentage of pine
+execGRASS('v.db.addcolumn', map='rawData_VRI', layer='1', columns='PinePC2 double precision')
+rule <- "CASE WHEN ((SPECIES__1 = 'PL') OR (SPECIES__1 = 'PLI')) THEN SPECIES__2 ELSE 0 END"
+execGRASS('v.db.update', map='rawData_VRI', column='PinePC2', query_column=rule)
+
+      # Species 3: Percentage of pine
+execGRASS('v.db.addcolumn', map='rawData_VRI', layer='1', columns='PinePC3 double precision')
+rule <- "CASE WHEN ((SPECIES__3 = 'PL') OR (SPECIES__3 = 'PLI')) THEN SPECIES__4 ELSE 0 END"
+execGRASS('v.db.update', map='rawData_VRI', column='PinePC3', query_column=rule)
+
+      # Species 4: Percentage of pine
+execGRASS('v.db.addcolumn', map='rawData_VRI', layer='1', columns='PinePC4 double precision')
+rule <- "CASE WHEN ((SPECIES__5 = 'PL') OR (SPECIES__5 = 'PLI')) THEN SPECIES__6 ELSE 0 END"
+execGRASS('v.db.update', map='rawData_VRI', column='PinePC4', query_column=rule)
+
+      # Species 5: Percentage of pine
+execGRASS('v.db.addcolumn', map='rawData_VRI', layer='1', columns='PinePC5 double precision')
+rule <- "CASE WHEN ((SPECIES__7 = 'PL') OR (SPECIES__7 = 'PLI')) THEN SPECIES__8 ELSE 0 END"
+execGRASS('v.db.update', map='rawData_VRI', column='PinePC5', query_column=rule)
+
+      # Species 6: Percentage of pine
+execGRASS('v.db.addcolumn', map='rawData_VRI', layer='1', columns='PinePC6 double precision')
+rule <- "CASE WHEN ((SPECIES__9 = 'PL') OR (SPECIES__9 = 'PLI')) THEN SPECIES_10 ELSE 0 END"
+execGRASS('v.db.update', map='rawData_VRI', column='PinePC6', query_column=rule)
+
+# Total percentage of pine
+execGRASS('v.db.addcolumn', map='rawData_VRI', layer='1', columns='PinePC double precision')
+rule <- "PinePC1 + PinePC2 + PinePC3 + PinePC4 + PinePC5 + PinePC6"
+execGRASS('v.db.update', map='rawData_VRI', column='PinePC', query_column=rule)
+
+# Binary Pine/Other column
 execGRASS('v.db.addcolumn', map='rawData_VRI', layer='1', columns='Pine integer')
-
-      # Create sqlite statement
-rule <- paste('CASE WHEN (SPECIES_CD =', sQuote('PL'), 'OR SPECIES_CD =', sQuote('PLI'), ') AND (SPECIES_PC >= 25) THEN 1 ELSE 0 END')
-
-      # Populate column
+rule <- paste("CASE WHEN PinePC >", pineThreshold, "THEN 1 ELSE 0 END")
 execGRASS('v.db.update', map='rawData_VRI', column='Pine', query_column=rule)
 
 # Rasterize
@@ -143,3 +178,4 @@ execGRASS('r.category', map='stateClass', rules=paste0(resultsDir, 'Tabular/Rule
 
 # Export
 execGRASS('r.out.gdal', input='stateClass', output=paste0(resultsDir, 'Spatial/DataLayers/StateClass.tif'), 'overwrite')
+execGRASS('r.out.gdal', input='MPB_mask', output=paste0(resultsDir, 'Spatial/DataLayers/MPB_mask.tif'), 'overwrite')
