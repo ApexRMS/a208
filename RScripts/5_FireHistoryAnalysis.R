@@ -14,6 +14,8 @@
 # Packages
 library(rgrass7)
 library(tidyverse)
+library(magrittr)
+library(openxlsx)
 
 # Settings
 Sys.setenv(TZ='GMT')
@@ -79,3 +81,79 @@ rm(res_row, res_col)
       # Apply to region
 execGRASS('g.region', raster='MASK', res=as.character(res))
 execGRASS('g.region', zoom='MASK', res=as.character(res))
+
+#### Fire History Analysis ####
+# Polygonize Primary Stratum raster
+execGRASS('r.to.vect', input='primaryStratum', output='primaryStratum_vect', type='area', column='Stratum')
+
+# Clip Fire Perimeters to study area
+execGRASS("v.clip", input='rawData_FirePerimeters', clip='primaryStratum_vect', output='firePerimeters_area')
+
+# Union Primary Stratum and Fire Perimeters
+execGRASS('v.overlay', ainput='primaryStratum_vect', binput='firePerimeters_area', operator="or", output='StratumUnionFire')
+
+# Area burned per stratum | year
+      # Compute area of each polygon
+execGRASS('v.db.addcolumn', map='StratumUnionFire', columns='Area double precision')
+execGRASS('v.to.db', map='StratumUnionFire', columns='Area', option='area', units='meters')
+
+      # Get attribute table
+att_StratumUnionFire <- v.get.att("StratumUnionFire", "&")
+
+      # Compute area burned per stratum | year
+areaBurned_Stratum_Year <- att_StratumUnionFire %>%
+  drop_na(b_cat) %>%
+  group_by(a_Stratum, b_FIRE_YEAR) %>%
+  summarize(AreaBurned_m2 = sum(Area)) %>%
+  rename(Stratum = a_Stratum, Year = b_FIRE_YEAR) %>%
+  arrange(Stratum, Year) %>%
+  mutate(AreaBurned_km2 = AreaBurned_m2/1000000) %>%
+  select(-AreaBurned_m2)
+
+# Total area per stratum
+      # Compute area of each polygon
+execGRASS('v.db.addcolumn', map='primaryStratum_vect', columns='Area double precision')
+execGRASS('v.to.db', map='primaryStratum_vect', columns='Area', option='area', units='meters')
+
+      # Get attribute table
+att_PrimaryStratum <- v.get.att("primaryStratum_vect", "&")
+
+      # Compute total area per stratum
+area_Stratum <- att_PrimaryStratum %>%
+  group_by(Stratum) %>%
+  summarize(TotalArea_m2 = sum(Area)) %>%
+  arrange(Stratum) %>%
+  mutate(TotalArea_km2 = TotalArea_m2/1000000) %>%
+  select(-TotalArea_m2)
+
+      # Area total area to areaBurned_Stratum_Year
+areaBurned_Stratum_Year %<>% left_join(., area_Stratum, by='Stratum') %>%
+  mutate(PercentBurned = AreaBurned_km2/TotalArea_km2)
+
+      # Export
+write.xlsx(areaBurned_Stratum_Year, paste0(resultsDir, 'Tabular/AreaBurned_ByStratum_ByYear.xlsx'))
+
+# Fire count by fire size class
+      # Get attribute table
+att_FirePerimeters <- v.get.att("firePerimeters_area", "&")
+
+      # Get fire sizes in km2
+fireSizes <- att_FirePerimeters %>%
+  mutate(Area_km2 = FIRE_SIZE_/100) %>%
+  select(Area_km2) %>%
+  arrange(Area_km2)
+
+      # Define size classes
+interval <- 10 # Set interval size
+mins <- seq(from=min(fireSizes), by=interval, length.out=ceiling(max(fireSizes)/interval))
+maxs <- mins+interval
+  
+      # Compute fire count by fire size class
+fireCount_SizeClass <- data.frame(SizeClass_Min = mins,
+                                  SizeClass_Max = maxs)
+fireCount_SizeClass$FireCount <- sapply(1:nrow(fireCount_SizeClass),
+                                        function(x) length(fireSizes[which((fireSizes$Area_km2 >= fireCount_SizeClass$SizeClass_Min[x]) & (fireSizes$Area_km2 < fireCount_SizeClass$SizeClass_Max[x])),]))
+
+      # Export
+write.csv(fireSizes, paste0(resultsDir, "Tabular/FireSizes.csv"), row.names=F)
+write.csv(fireCount_SizeClass, paste0(resultsDir, "Tabular/FireCount_bySizeClass.csv"), row.names=F)
