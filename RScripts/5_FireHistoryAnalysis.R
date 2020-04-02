@@ -128,7 +128,7 @@ area_Stratum <- att_PrimaryStratum %>%
   mutate(TotalArea_km2 = TotalArea_m2/1000000) %>%
   select(-TotalArea_m2)
 
-      # Area total area to areaBurned_Stratum_Year
+      # Compute percentage burned per stratum
 areaBurned_Stratum_Year %<>% left_join(., area_Stratum, by='Stratum') %>%
   mutate(PercentBurned = AreaBurned_km2/TotalArea_km2)
 
