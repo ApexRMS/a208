@@ -141,20 +141,19 @@ att_FirePerimeters <- v.get.att("firePerimeters_area", "&")
 
       # Get fire sizes in km2
 fireSizes <- att_FirePerimeters %>%
-  mutate(Area_km2 = FIRE_SIZE_/100) %>%
-  select(Area_km2) %>%
-  arrange(Area_km2)
+  rename(Area_ha = FIRE_SIZE_) %>%
+  select(Area_ha) %>%
+  arrange(Area_ha)
 
       # Define size classes
-interval <- 10 # Set interval size
-mins <- seq(from=min(fireSizes), by=interval, length.out=ceiling(max(fireSizes)/interval))
-maxs <- mins+interval
+mins <- c(0, 1, 10, 100, 1000, 10000)
+maxs <- c(1, 10, 100, 1000, 10000, ceiling(max(fireSizes)))
   
       # Compute fire count by fire size class
-fireCount_SizeClass <- data.frame(SizeClass_Min_km2 = mins,
-                                  SizeClass_Max_km2 = maxs)
+fireCount_SizeClass <- data.frame(SizeClass_Min_ha = mins,
+                                  SizeClass_Max_ha = maxs)
 fireCount_SizeClass$FireCount <- sapply(1:nrow(fireCount_SizeClass),
-                                        function(x) length(fireSizes[which((fireSizes$Area_km2 >= fireCount_SizeClass$SizeClass_Min_km2[x]) & (fireSizes$Area_km2 < fireCount_SizeClass$SizeClass_Max_km2[x])),]))
+                                        function(x) length(fireSizes[which((fireSizes$Area_ha >= fireCount_SizeClass$SizeClass_Min_ha[x]) & (fireSizes$Area_ha < fireCount_SizeClass$SizeClass_Max_ha[x])),]))
 
       # Export
 write.csv(fireSizes, paste0(resultsDir, "Tabular/FireSizes.csv"), row.names=F)
