@@ -88,8 +88,8 @@ execGRASS('g.region', zoom='MASK', res=as.character(res))
 # Polygonize Primary Stratum raster
 execGRASS('r.to.vect', input='primaryStratum', output='primaryStratum_vect', type='area', column='Stratum')
 
-# Clip Fire Perimeters to study area
-execGRASS("v.clip", input='rawData_FirePerimeters', clip='primaryStratum_vect', output='firePerimeters_area')
+# Select Fire Perimeters overlapping study area
+execGRASS("v.select", ainput='rawData_FirePerimeters', binput='primaryStratum_vect', output='firePerimeters_area', operator='overlap')
 
 # Union Primary Stratum and Fire Perimeters
 execGRASS('v.overlay', ainput='primaryStratum_vect', binput='firePerimeters_area', operator="or", output='StratumUnionFire')
@@ -105,6 +105,7 @@ att_StratumUnionFire <- v.get.att("StratumUnionFire", "&")
       # Compute area burned per stratum | year
 areaBurned_Stratum_Year <- att_StratumUnionFire %>%
   drop_na(b_cat) %>%
+  drop_na(a_cat) %>%
   group_by(a_Stratum, b_FIRE_YEAR) %>%
   summarize(AreaBurned_m2 = sum(Area)) %>%
   rename(Stratum = a_Stratum, Year = b_FIRE_YEAR) %>%
