@@ -149,10 +149,10 @@ mins <- seq(from=min(fireSizes), by=interval, length.out=ceiling(max(fireSizes)/
 maxs <- mins+interval
   
       # Compute fire count by fire size class
-fireCount_SizeClass <- data.frame(SizeClass_Min = mins,
-                                  SizeClass_Max = maxs)
+fireCount_SizeClass <- data.frame(SizeClass_Min_km2 = mins,
+                                  SizeClass_Max_km2 = maxs)
 fireCount_SizeClass$FireCount <- sapply(1:nrow(fireCount_SizeClass),
-                                        function(x) length(fireSizes[which((fireSizes$Area_km2 >= fireCount_SizeClass$SizeClass_Min[x]) & (fireSizes$Area_km2 < fireCount_SizeClass$SizeClass_Max[x])),]))
+                                        function(x) length(fireSizes[which((fireSizes$Area_km2 >= fireCount_SizeClass$SizeClass_Min_km2[x]) & (fireSizes$Area_km2 < fireCount_SizeClass$SizeClass_Max_km2[x])),]))
 
       # Export
 write.csv(fireSizes, paste0(resultsDir, "Tabular/FireSizes.csv"), row.names=F)
