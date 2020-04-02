@@ -8,6 +8,8 @@
 # 1. Creates a FireHistoryAnalysis GRASS mapset                                                                            #
 # 2. Imports Primary Stratum data and Fire Perimeters data to GRASS mapset                                                 #
 # 3. Imports study region clipping mask to GRASS mapset                                                                    #
+# 4. Computes area burned per year and Primary Stratum                                                                     #
+# 5. Determines the fire size class distribution                                                                           #
 ############################################################################################################################
 
 #### Workspace ####
