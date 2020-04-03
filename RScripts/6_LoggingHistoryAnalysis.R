@@ -106,15 +106,34 @@ execGRASS('v.to.db', map='StratumUnionCutblocks', columns='Area', option='area',
       # Get attribute table
 att_StratumUnionCutblocks <- v.get.att("StratumUnionCutblocks", "&")
 
+      # Create template stratum | year dataframe
+strata <- att_StratumUnionCutblocks %>%
+  drop_na(a_b_cat) %>% # Remove areas that are not part of the Primary/Secondary Stratum
+  rename(PrimaryStratum = a_b_Stratum, SecondaryStratum = b_Stratum) %>%
+  select(PrimaryStratum, SecondaryStratum) %>%
+  arrange(PrimaryStratum, SecondaryStratum) %>%
+  distinct()
+
+years <- min(att_StratumUnionCutblocks$a_a_HARVEST_YE, na.rm=T):max(att_StratumUnionCutblocks$a_a_HARVEST_YE, na.rm=T)
+
+template <- data.frame(PrimaryStratum = rep(strata$PrimaryStratum, times=length(years)),
+                       SecondaryStratum = rep(strata$SecondaryStratum, times=length(years)),
+                       Year = rep(years, each=nrow(strata)))
+
       # Compute area clearcut per stratum | year
 areaCut_Stratum_Year <- att_StratumUnionCutblocks %>%
-  drop_na(a_a_cat) %>% # Remove areas that were not cut
   drop_na(a_b_cat) %>% # Remove areas that are not part of the Primary/Secondary Stratum
+  drop_na(a_a_cat) %>% # Remove areas that were not cut
   rename(PrimaryStratum = a_b_Stratum, SecondaryStratum = b_Stratum, Year = a_a_HARVEST_YE) %>%
   group_by(PrimaryStratum, SecondaryStratum, Year) %>%
   summarize(AreaCut_ha = sum(Area)) %>%
   arrange(PrimaryStratum, SecondaryStratum, Year) %>%
   ungroup()
+
+      # Populate template database
+areaCut_Stratum_Year %<>% left_join(template, .) %>%
+  mutate(AreaCut_ha = replace_na(AreaCut_ha, 0)) %>%
+  arrange(PrimaryStratum, SecondaryStratum, Year)
 
       # Change Stratum ID to Stratum Name
 areaCut_Stratum_Year$PrimaryStratum <- sapply(areaCut_Stratum_Year$PrimaryStratum, function(x) subzoneID$Name[which(subzoneID$ID == x)])
