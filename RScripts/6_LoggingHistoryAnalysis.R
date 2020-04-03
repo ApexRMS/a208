@@ -30,6 +30,11 @@ spatialDataDir <- "E:/a208/Data/Spatial/"
 tabularDataDir <- "E:/a208/Data/Tabular/"
 resultsDir <- "E:/a208/Results/"
 
+# Tabular data - Load
+subzoneID <- read.xlsx(paste0(tabularDataDir, "BEC Subzone.xlsx"), sheet="Stratum") %>% # Load
+  mutate(Name = ifelse(Name == 'SBSwc', 'SBSwk', ifelse(Name == 'ESSFmv2', 'ESSFmv', ifelse(Name == 'BWBSwk1', 'BWBSwk', Name)))) # Correct errors in .xlsx file
+secondaryStratumID <- read.xlsx(paste0(tabularDataDir, 'SecondaryStratumID.xlsx'))
+
 # Function - Get GRASS vector attribute table
 v.get.att <- function(vector_name, sep){
   # Get attributes
@@ -108,14 +113,23 @@ areaCut_Stratum_Year <- att_StratumUnionCutblocks %>%
   rename(PrimaryStratum = a_b_Stratum, SecondaryStratum = b_Stratum, Year = a_a_HARVEST_YE) %>%
   group_by(PrimaryStratum, SecondaryStratum, Year) %>%
   summarize(AreaCut_ha = sum(Area)) %>%
-  arrange(PrimaryStratum, SecondaryStratum, Year)
+  arrange(PrimaryStratum, SecondaryStratum, Year) %>%
+  ungroup()
+
+      # Change Stratum ID to Stratum Name
+areaCut_Stratum_Year$PrimaryStratum <- sapply(areaCut_Stratum_Year$PrimaryStratum, function(x) subzoneID$Name[which(subzoneID$ID == x)])
+areaCut_Stratum_Year$SecondaryStratum <- sapply(areaCut_Stratum_Year$SecondaryStratum, function(x) secondaryStratumID$Name[which(secondaryStratumID$Secondary.Stratum.ID == x)])
 
       # Export
 write.xlsx(areaCut_Stratum_Year, paste0(resultsDir, 'Tabular/AreaCut_ByStratum_ByYear.xlsx'))
 
 # Clearcut count by clearcut size class
       # Select CUTBLOCKS that overlap study area
-execGRASS("v.select", ainput='rawData_CUTBLOCKS', binput='primaryStratum_vect', output='CUTBLOCKS_area', operator='overlap', 'overwrite')
+execGRASS("v.select", ainput='rawData_CUTBLOCKS', binput='primaryStratum_vect', output='CUTBLOCKS_area_inter', operator='overlap', 'overwrite')
+
+      # Remove clearcuts that are older than year 2000
+execGRASS('v.extract', input='CUTBLOCKS_area_inter', where='HARVEST_YE >= 2000', output='CUTBLOCKS_area')
+execGRASS('g.remove', type='vector', name='CUTBLOCKS_area_inter', 'f')
 
       # Multipart to singlepart
 execGRASS('v.db.droptable', map='CUTBLOCKS_area', 'f')
@@ -131,7 +145,7 @@ execGRASS('v.to.db', map='CUTBLOCKS_area_singlePart', columns='Area', option='ar
       # Get attribute table
 att_CUTBLOCKS <- v.get.att("CUTBLOCKS_area_singlePart", "&")
 
-      # Get fire sizes in km2
+      # Get fire sizes in ha
 cutSizes <- att_CUTBLOCKS %>%
   rename(Area_ha = Area) %>%
   select(Area_ha) %>%
