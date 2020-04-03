@@ -101,7 +101,7 @@ execGRASS('g.region', raster='MASK', res=as.character(res))
 execGRASS('g.region', zoom='MASK', res=as.character(res))
 
 #### Input 1 - Get broad Land Cover from AAFC 2010 LANDCOVER layer ####
-write.table(c('21=2', '25=2', '31=3', '41=4', '42=4', '45=4', '46=4', '51=5', '61=6', '61=6', '71=7', '73=7', '74=7', '91=9'), paste0(resultsDir, 'Tabular/Rules/StateClass_getBroadLandCover.txt'), sep="", col.names=FALSE, quote=FALSE, row.names=FALSE)
+write.table(c('21=2', '25=2', '31=3', '41=4', '42=4', '45=4', '46=4', '51=5', '61=6', '62=6', '71=7', '73=7', '74=7', '91=9'), paste0(resultsDir, 'Tabular/Rules/StateClass_getBroadLandCover.txt'), sep="", col.names=FALSE, quote=FALSE, row.names=FALSE)
 execGRASS('r.reclass', input='LC2010_agg_mask', output='LC2010_broad_mask_inter', rules=paste0(resultsDir, 'Tabular/Rules/StateClass_getBroadLandCover.txt'), flags=c('overwrite'))
 execGRASS('r.mapcalc', expression='LC2010_broad_mask = LC2010_broad_mask_inter', region='current', flags='overwrite')
 execGRASS('g.remove', type='raster', name='LC2010_broad_mask_inter', flags='f')
