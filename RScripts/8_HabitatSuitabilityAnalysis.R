@@ -126,7 +126,7 @@ execGRASS('g.region', raster='MASK', res=as.character(res))
 execGRASS('g.region', zoom='MASK', res=as.character(res))
 
 #### Habitat Suitability Analysis ####
-for(scenarioId in scenarioIDs){
+for(scenarioId in scenarioIds){
   # ST-Sim outputs @ Scenario-level
         # Scenario
   scenario <- scenario(library, scenario = scenarioId)
