@@ -15,6 +15,11 @@
 # 8. Saves outputs back to the ST-Sim library                                                                              #
 ############################################################################################################################
 
+#### Mandatory Manual Step ####
+# 1. In SQLiteStudio, go to table core_ScenarioResult
+# 2. Identify the row(s) corresponding to the result scenario(s) of interest, and record the information contained within the row(s) for future reference
+# 3. Delete the row(s)
+
 #### Workspace ####
 # Packages
 library(rgrass7)
@@ -166,13 +171,13 @@ for(scenarioId in scenarioIds){
       writeRaster(output_forestAge, paste0(resultsDir, "Spatial/Temp/ForestAge.tif"))
       
             # Import to GRASS mapset
-      execGRASS('r.import', input=paste0(resultsDir, "Spatial/Temp/StateClass.tif"), output='output_stateClass_inter')
-      execGRASS('r.import', input=paste0(resultsDir, "Spatial/Temp/ForestAge.tif"), output='output_forestAge_inter')
+      execGRASS('r.import', input=paste0(resultsDir, "Spatial/Temp/StateClass.tif"), output='output_stateClass_inter', 'overwrite')
+      execGRASS('r.import', input=paste0(resultsDir, "Spatial/Temp/ForestAge.tif"), output='output_forestAge_inter', 'overwrite')
       unlink(paste0(resultsDir, "Spatial/Temp"), recursive = T)
       
             # Convert rasters to integer
-      execGRASS('r.mapcalc', expression='output_stateClass = int(output_stateClass_inter)')
-      execGRASS('r.mapcalc', expression='output_forestAge = int(output_forestAge_inter)')
+      execGRASS('r.mapcalc', expression='output_stateClass = int(output_stateClass_inter)', 'overwrite')
+      execGRASS('r.mapcalc', expression='output_forestAge = int(output_forestAge_inter)', 'overwrite')
       execGRASS('g.remove', type='raster', name='output_stateClass_inter', 'f')
       execGRASS('g.remove', type='raster', name='output_forestAge_inter', 'f')
       
@@ -184,8 +189,8 @@ for(scenarioId in scenarioIds){
       execGRASS('g.remove', type='raster', name='output_cuts_inter', flags='f')
       
             # Produce "MPB" raster
-      execGRASS('r.mapcalc', expression='mask_zero = if(MASK, 0)')
-      execGRASS('r.patch', input=c('MPB_mask', 'mask_zero'), output='output_MPB')
+      execGRASS('r.mapcalc', expression='mask_zero = if(MASK, 0)', 'overwrite')
+      execGRASS('r.patch', input=c('MPB_mask', 'mask_zero'), output='output_MPB', 'overwrite')
       
             # Produce "Time-since-cut" raster
       execGRASS('r.mapcalc', expression="output_timeSinceCut_inter = if(output_cuts, output_forestAge, null())")
@@ -219,9 +224,9 @@ for(scenarioId in scenarioIds){
       execGRASS('r.to.vect', input='output_cutSize', output='output_cutSize_vect', type='area', 'overwrite')
       
             # Union
-      execGRASS('v.overlay', ainput='output_cuts_vect', binput='output_MPB_vect', operator='or', output='output_Cuts_MPB')
-      execGRASS('v.overlay', ainput='output_Cuts_MPB', binput='output_timeSinceCut_vect', operator='or', output='output_Cuts_MPB_TimeSinceCut')
-      execGRASS('v.overlay', ainput='output_Cuts_MPB_TimeSinceCut', binput='output_cutSize_vect', operator='or', output='habitatSuitability')
+      execGRASS('v.overlay', ainput='output_cuts_vect', binput='output_MPB_vect', operator='or', output='output_Cuts_MPB', 'overwrite')
+      execGRASS('v.overlay', ainput='output_Cuts_MPB', binput='output_timeSinceCut_vect', operator='or', output='output_Cuts_MPB_TimeSinceCut', 'overwrite')
+      execGRASS('v.overlay', ainput='output_Cuts_MPB_TimeSinceCut', binput='output_cutSize_vect', operator='or', output='habitatSuitability', 'overwrite')
       
             # Organize columns
       execGRASS('v.db.renamecolumn', map='habitatSuitability', column=c('a_a_a_value', 'Cut'))
@@ -261,7 +266,7 @@ for(scenarioId in scenarioIds){
       }
       
       # Habitat Suitability - Rasterize
-      execGRASS('v.to.rast', input='habitatSuitability', output=paste0('habitatSuitability_', it), use='attr', attribute_column='HabitatSuitability')
+      execGRASS('v.to.rast', input='habitatSuitability', output=paste0('habitatSuitability_', it), use='attr', attribute_column='HabitatSuitability', 'overwrite')
       
       # Habitat Suitability - Calculate amount per stratum
             # Union Stratum and Habitat Suitability
@@ -289,7 +294,11 @@ for(scenarioId in scenarioIds){
     # Habitat Suitability - Average across all iterations
           # Compute
     maps <- paste0('HabitatSuitability_', 1:nIterations)
-    execGRASS('r.mapcalc', expression = paste0('HabitatSuitability_Scenario', scenarioId, '_Timestep', ts, ' = (', paste0(maps, collapse="+"), ')/', nIterations))
+    execGRASS('r.mapcalc', expression = paste0('HabitatSuitability_avg = (', paste0(maps, collapse="+"), ')/', nIterations), 'overwrite')
+    
+          # Convert to raster
+    execGRASS('r.out.gdal', input='HabitatSuitability_avg', output=paste0(resultsDir, "Spatial/DataLayers/HabitatSuitability_Scenario", scenarioId, "_Timestep", ts, ".tif"), 'overwrite')
+    habitatSuitability <- raster(paste0(resultsDir, "Spatial/DataLayers/HabitatSuitability_Scenario", scenarioId, "_Timestep", ts, ".tif"))
     
           # Save to ST-Sim library
     filename <- paste0("sa_", key, ".it1.ts", ts, ".tif")
@@ -297,9 +306,16 @@ for(scenarioId in scenarioIds){
                        Timestep = ts,
                        StateAttributeTypeID = "OSFL Habitat",
                        Filename = filename)
-    saveDatasheet(scenario, data=, name="stsim_OutputSpatialStateAttribute", append=T)
+    fileData <- setNames(habitatSuitability, filename)
+    saveDatasheet(scenario, data=data, name="stsim_OutputSpatialStateAttribute", fileData=fileData, append=T)
   }
   # Save tabular data to ST-Sim library
-  finalTable %<>% mutate(StateAttributeTypeID = "OSFL Habitat")
+  finalTable %<>% mutate(StateAttributeTypeID = "OSFL Habitat",
+                         AgeClass = "20")
   saveDatasheet(scenario, data=finalTable, name='stsim_OutputStateAttribute', append=T)
+  write.csv(finalTable, paste0(resultsDir, "Tabular/OutputStateAttribute.csv"), row.names = F)
 }
+
+#### Mandatory Manual Step ####
+# 1. In SQLiteStudio, go to table core_ScenarioResult
+# 2. Re-populate the row(s) that you deleted at the top of the script
