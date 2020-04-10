@@ -1,13 +1,18 @@
 #### a208: ECCC Olive Sided Fly Catcher Landscape Change and Habitat Model 
-#### Script by Chlo? Debyser
+#### Script by Chloé Debyser, adapted from script provided by Environment and Climate Change Canada
 
 #### 8. Habitat Suitability Analysis
 
 ############################################################################################################################
 # This code:                                                                                                               #
 # 1. Creates a HabitatSuitabilityAnalysis GRASS mapset                                                                     #
-# 2. Imports SyncroSim State Class and Forest Age output rasters to GRASS mapset                                           #
+# 2. Imports MPB data to the GRASS mapset                                                                                  #
 # 3. Imports study region clipping mask to GRASS mapset                                                                    #
+# 4. Loads ST-Sim library, project, and scenario                                                                           #
+# 6. Produces a map of habitat suitability per target scenario, iteration, and timestep                                    #
+# 5. Computes, in each case, the total amount of habitat suitability per primary stratum per secondary stratum             #
+# 7. Produces a map of habitat suitability per timestep, by averaging across all iterations                                #
+# 8. Saves outputs back to the ST-Sim library                                                                              #
 ############################################################################################################################
 
 #### Workspace ####
@@ -32,12 +37,40 @@ tabularDataDir <- "E:/a208/Data/Tabular/"
 resultsDir <- "E:/a208/Results/"
 
 # Input Parameters
-scenarioIds <- c(27) # Can be one or multiple Scenario IDs
-library_path <- paste0(resultsDir, "ssimLibrary/DawsonTSA.ssim.backup.2020-04-09-at-16-04-24/DawsonTSA.ssim")
+scenarioIds <- c(30) # Can be one or multiple Scenario IDs
+library_path <- paste0(resultsDir, "ssimLibrary/DawsonTSA.ssim.backup.2020-04-10-at-16-57-26/DawsonTSA.ssim")
   
 # Statistical Models
+      # Load models
 m0 <- readRDS(paste0(tabularDataDir,"OSFL_uncut5.rds"))
 m1 <- readRDS(paste0(tabularDataDir,"OSFL_cut4.rds"))
+
+      # Scaling parameters
+MeanTcut <- 10.74684
+SDTcut <- 10.19146
+MeanCutSz <- 51.59121
+SDCutSz <- 33.01943
+
+# Tabular data - Load
+subzoneID <- read.xlsx(paste0(tabularDataDir, "BEC Subzone.xlsx"), sheet="Stratum") %>% # Load
+  mutate(Name = ifelse(Name == 'SBSwc', 'SBSwk', ifelse(Name == 'ESSFmv2', 'ESSFmv', ifelse(Name == 'BWBSwk1', 'BWBSwk', Name)))) # Correct errors in .xlsx file
+secondaryStratumID <- read.xlsx(paste0(tabularDataDir, 'SecondaryStratumID.xlsx'))
+
+# ST-Sim outputs @ Project level
+      # Library
+library <- ssimLibrary(library_path)
+
+      # Project
+project <- project(library, project=1)
+
+      # Add "OSFL Habitat" state attribute type
+stsim_StateAttributeType <- datasheet(project, "stsim_StateAttributeType")
+stsim_StateAttributeType <- addRow(stsim_StateAttributeType, 'OSFL Habitat')
+saveDatasheet(project, stsim_StateAttributeType, "stsim_StateAttributeType")
+
+      # Get "OSFL Habitat" key
+stsim_StateAttributeType <- datasheet(project, "stsim_StateAttributeType", includeKey = T)
+key <- stsim_StateAttributeType$StateAttributeTypeID[which(stsim_StateAttributeType$Name == 'OSFL Habitat')]
 
 # Function - Get GRASS vector attribute table
 v.get.att <- function(vector_name, sep){
@@ -95,9 +128,6 @@ execGRASS('g.region', zoom='MASK', res=as.character(res))
 #### Habitat Suitability Analysis ####
 for(scenarioId in scenarioIDs){
   # ST-Sim outputs @ Scenario-level
-        # Library
-  library <- ssimLibrary(library_path)
-  
         # Scenario
   scenario <- scenario(library, scenario = scenarioId)
   
@@ -114,6 +144,13 @@ for(scenarioId in scenarioIDs){
         # Inputs - Import to GRASS mapset
   execGRASS('r.import', input=primaryStratum_name, output='primaryStratum')
   execGRASS('r.import', input=secondaryStratum_name, output='secondaryStratum')
+  
+        # Inputs - Polygonize
+              # Primary Stratum raster
+  execGRASS('r.to.vect', input='primaryStratum', output='primaryStratum_vect', type='area', column='Stratum')
+  
+              # Secondary Stratum raster
+  execGRASS('r.to.vect', input='secondaryStratum', output='secondaryStratum_vect', type='area', column='Stratum')
   
   for(ts in timeSteps){
     
@@ -184,33 +221,85 @@ for(scenarioId in scenarioIDs){
             # Union
       execGRASS('v.overlay', ainput='output_cuts_vect', binput='output_MPB_vect', operator='or', output='output_Cuts_MPB')
       execGRASS('v.overlay', ainput='output_Cuts_MPB', binput='output_timeSinceCut_vect', operator='or', output='output_Cuts_MPB_TimeSinceCut')
-      execGRASS('v.overlay', ainput='output_Cuts_MPB_TimeSinceCut', binput='output_cutSize_vect', operator='or', output='output_all')
+      execGRASS('v.overlay', ainput='output_Cuts_MPB_TimeSinceCut', binput='output_cutSize_vect', operator='or', output='habitatSuitability')
       
             # Organize columns
-      execGRASS('v.db.renamecolumn', map='output_all', column=c('a_a_a_value', 'Cut'))
-      execGRASS('v.db.renamecolumn', map='output_all', column=c('a_a_b_value', 'ModSevMPB'))
-      execGRASS('v.db.renamecolumn', map='output_all', column=c('a_b_value', 'T_since_cut'))
-      execGRASS('v.db.renamecolumn', map='output_all', column=c('b_value', 'Cut_size_ha'))
-      execGRASS('v.db.dropcolumn', map='output_all', columns=c('a_cat', 'a_a_cat', 'a_a_a_cat', 'a_a_a_label', 'a_a_b_cat', 'a_a_b_label', 'a_b_cat', 'a_b_label', 'b_cat'))
+      execGRASS('v.db.renamecolumn', map='habitatSuitability', column=c('a_a_a_value', 'Cut'))
+      execGRASS('v.db.renamecolumn', map='habitatSuitability', column=c('a_a_b_value', 'ModSevMPB'))
+      execGRASS('v.db.renamecolumn', map='habitatSuitability', column=c('a_b_value', 'T_since_cut'))
+      execGRASS('v.db.renamecolumn', map='habitatSuitability', column=c('b_value', 'Cut_size_ha'))
+      execGRASS('v.db.dropcolumn', map='habitatSuitability', columns=c('a_cat', 'a_a_cat', 'a_a_a_cat', 'a_a_a_label', 'a_a_b_cat', 'a_a_b_label', 'a_b_cat', 'a_b_label', 'b_cat'))
       
-            # Get attribute table
-      att_outputs <- v.get.att('output_all', '&')
+            # Format attribute table
+      att_habitatSuitability <- v.get.att('habitatSuitability', '&') %>%
+        mutate(PCYear = 2025) %>%
+        mutate(Cut = as.factor(Cut),
+               PCYear = as.factor(PCYear),
+               ModSevMPB = as.factor(ModSevMPB))
       
       # Habitat Suitability - Compute
+            # Scale variables
+      att_habitatSuitability$T_cut_sc <- ifelse(att_habitatSuitability$Cut=="1", (att_habitatSuitability$T_since_cut - MeanTcut)/SDTcut, NA)
+      att_habitatSuitability$Cut_size_sc <- ifelse(att_habitatSuitability$Cut=="1", (att_habitatSuitability$Cut_size_ha - MeanCutSz)/SDCutSz,NA)
       
-      # Habitat Suitability - Calculate amount per stratum
-            # Compute
+            # Add quadratic effect for T_since_cut
+      att_habitatSuitability$T_cut_sc_sq <- (att_habitatSuitability$T_cut_sc)^2
       
-            # Save tabular data
+            # Predict OSFL presence using m1 for cut sites and m0 for uncut sites
+      att_habitatSuitability$preds <- ifelse(att_habitatSuitability$Cut==1,
+                                             predict(m1, newdata=att_habitatSuitability, type="response", allow.new.levels=T),
+                                             predict(m0, newdata=att_habitatSuitability, type="response", allow.new.levels=T))
+      
+            # Add to attribute table
+      execGRASS('v.db.addcolumn', map='habitatSuitability', columns='HabitatSuitability double precision')
+      for(i in 1:ceiling(nrow(att_habitatSuitability)/50)){
+        start <- (i-1)*50+1
+        end <- ifelse(i==ceiling(nrow(att_habitatSuitability)/50), nrow(att_habitatSuitability), i*50)
+        rule <- paste('CASE', paste(paste('WHEN cat =', att_habitatSuitability$cat[start:end], 'THEN', att_habitatSuitability$preds[start:end]), collapse=" "), 'ELSE HabitatSuitability END')
+        execGRASS('v.db.update', map='habitatSuitability', column='HabitatSuitability', query_column=rule)
+        print(paste(i, "of", ceiling(nrow(att_habitatSuitability)/50), ":", Sys.time()))
+      }
       
       # Habitat Suitability - Rasterize
-            # Rasterize
+      execGRASS('v.to.rast', input='habitatSuitability', output=paste0('habitatSuitability_', it), use='attr', attribute_column='HabitatSuitability')
       
-            # Save raster
+      # Habitat Suitability - Calculate amount per stratum
+            # Union Stratum and Habitat Suitability
+      execGRASS('v.overlay', ainput='habitatSuitability', binput="primaryStratum_vect", operator="or", output='PrimaryStratum_Habitat', 'overwrite')
+      execGRASS('v.overlay', ainput='PrimaryStratum_Habitat', binput="secondaryStratum_vect", operator="or", output='Stratum_Habitat', 'overwrite')
       
+            # Habitat suitability amount | Primary Stratum | Secondary Stratum
+      att_stratumHabitat <- v.get.att("Stratum_Habitat", "&") %>%
+        rename(HabitatSuitability = a_a_HabitatSuitability, StratumID = a_b_Stratum, SecondaryStratumID = b_Stratum) %>%
+        group_by(StratumID, SecondaryStratumID) %>%
+        summarize(Amount = sum(HabitatSuitability)) %>%
+        ungroup() %>%
+        mutate(Iteration = it, Timestep = ts) %>%
+        dplyr::select(Iteration, Timestep, StratumID, SecondaryStratumID, Amount)
+      att_stratumHabitat$StratumID <- sapply(att_stratumHabitat$StratumID, function(x) subzoneID$Name[which(subzoneID$ID == x)])
+      att_stratumHabitat$SecondaryStratumID <- sapply(att_stratumHabitat$SecondaryStratumID, function(x) secondaryStratumID$Name[which(secondaryStratumID$Secondary.Stratum.ID == x)])
+      
+            # Save
+      if(!exists("finalTable")){
+        finalTable <- att_stratumHabitat
+      }else{
+        finalTable <- bind_rows(finalTable, att_stratumHabitat)
+      }
     }
-    
     # Habitat Suitability - Average across all iterations
+          # Compute
+    maps <- paste0('HabitatSuitability_', 1:nIterations)
+    execGRASS('r.mapcalc', expression = paste0('HabitatSuitability_Scenario', scenarioId, '_Timestep', ts, ' = (', paste0(maps, collapse="+"), ')/', nIterations))
     
+          # Save to ST-Sim library
+    filename <- paste0("sa_", key, ".it1.ts", ts, ".tif")
+    data <- data.frame(Iteration = 1,
+                       Timestep = ts,
+                       StateAttributeTypeID = "OSFL Habitat",
+                       Filename = filename)
+    saveDatasheet(scenario, data=, name="stsim_OutputSpatialStateAttribute", append=T)
   }
+  # Save tabular data to ST-Sim library
+  finalTable %<>% mutate(StateAttributeTypeID = "OSFL Habitat")
+  saveDatasheet(scenario, data=finalTable, name='stsim_OutputStateAttribute', append=T)
 }
