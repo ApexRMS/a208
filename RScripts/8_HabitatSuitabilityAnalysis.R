@@ -50,9 +50,6 @@ m1_path <- paste0(tabularDataDir,"OSFL_cut4.rds") # Path to ECCC m1 model for OS
       # Tabular data
 subzoneID_path <- paste0(tabularDataDir, "BEC Subzone.xlsx") # Path to Primary Stratum labels
 
-      # Spatial data
-MPB_path <- paste0(resultsDir, "Spatial/DataLayers/MPB_mask.tif")
-
 #### Load Data ####
 # Statistical Models
       # Load models
@@ -83,9 +80,6 @@ saveDatasheet(project, stsim_StateAttributeType, "stsim_StateAttributeType")
       # Get "OSFL Habitat" key
 stsim_StateAttributeType <- datasheet(project, "stsim_StateAttributeType", includeKey = T)
 key <- stsim_StateAttributeType$StateAttributeTypeID[which(stsim_StateAttributeType$Name == 'OSFL Habitat')]
-
-# Spatial data
-MPB <- raster(MPB_path)
 
 # Tabular data
 subzoneID <- read.xlsx(subzoneID_path, sheet="Stratum") %>% # Load
@@ -119,13 +113,6 @@ for(scenarioId in scenarioIds){
   keys_primaryStratum <- datasheet(scenario, name = "stsim_Stratum", includeKey = T)
   keys_secondaryStratum <- datasheet(scenario, name = "stsim_SecondaryStratum", includeKey = T)
   
-        # Format "MPB" raster
-  reclassRules <- matrix(c(1, 0, 2, 0, 3, 0), ncol=2, byrow=T)
-  mask <- reclassify(x=secondaryStratum, rcl=reclassRules)
-  mask[] <- as.integer(mask[])
-  MPB <- merge(MPB, mask, overlap=T)
-  rm(reclassRules)
-  
   for(ts in timeSteps){
     
     # Parallelize over iterations
@@ -144,6 +131,11 @@ for(scenarioId in scenarioIds){
       reclassRules <- matrix(c(2, 0, 3, 0, 5, 0, 6, 0, 7, 0, 9, 0, 10, 0, 11, 0, 12, 1, 13, 0, 14, 1), ncol=2, byrow=T)
       cuts <- reclassify(x=stateClass, rcl=reclassRules)
       cuts[] <- as.integer(cuts[])
+      
+            # Prodice "MPB" raster (1 if area experienced moderate, severe, or very severe MPB; 0 otherwise)
+      reclassRules <- matrix(c(2, 0, 3, 0, 5, 0, 6, 0, 7, 0, 9, 0, 10, 0, 11, 1, 12, 0, 13, 0, 14, 0), ncol=2, byrow=T)
+      MPB <- reclassify(x=stateClass, rcl=reclassRules)
+      MPB[] <- as.integer(MPB[])
       
             # Produce "Time-since-cut" raster
                   # Create empty raster
