@@ -199,7 +199,7 @@ for(scenarioId in scenarioIds){
       
       # Habitat Suitability - Compute
             # Get input parameters
-      df_habitatSuitability <- data.frame(Cut = cuts[], ModSevMPB = MPB[], T_since_cut = timeSinceCut[], Cut_size_ha = cutSizes[], PCYear = 2025) %>%
+      df_habitatSuitability <- data.frame(StateClass = stateClass[], Cut = cuts[], ModSevMPB = MPB[], T_since_cut = timeSinceCut[], Cut_size_ha = cutSizes[], PCYear = 2025) %>%
         mutate(Cut = as.factor(Cut),
                PCYear = as.factor(PCYear),
                ModSevMPB = as.factor(ModSevMPB))
@@ -212,9 +212,11 @@ for(scenarioId in scenarioIds){
       df_habitatSuitability$T_cut_sc_sq <- (df_habitatSuitability$T_cut_sc)^2
       
             # Predict OSFL presence using m1 for cut sites and m0 for uncut sites
-      df_habitatSuitability$preds <- ifelse(df_habitatSuitability$Cut==1,
-                                            predict(m1, newdata=df_habitatSuitability, type="response", allow.new.levels=T),
-                                            predict(m0, newdata=df_habitatSuitability, type="response", allow.new.levels=T))
+      df_habitatSuitability$preds <- ifelse(df_habitatSuitability$StateClass < 10, # If not forest, set habitat suitability to 0
+                                            0,
+                                            ifelse(df_habitatSuitability$Cut==1,
+                                                   predict(m1, newdata=df_habitatSuitability, type="response", allow.new.levels=T),
+                                                   predict(m0, newdata=df_habitatSuitability, type="response", allow.new.levels=T)))
       
             # Create Habitat Suitability raster
       habitatSuitability <- mask
