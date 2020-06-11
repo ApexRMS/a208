@@ -41,7 +41,7 @@ scenarioIds <- c(30) # Can be one or multiple Scenario IDs
 
 # File Paths
       # ST-Sim library
-library_path <- paste0(resultsDir, "ssimLibrary/DawsonTSA.ssim.backup.2020-04-10-at-16-57-26/DawsonTSA.ssim") # Path to ST-Sim library
+library_path <- paste0(resultsDir, "ssimLibrary/DawsonTSA.ssim.backup.2020-04-10-at-16-57-26_CD_2020.06.11/DawsonTSA.ssim") # Path to ST-Sim library
 
       # Statistical models
 m0_path <- paste0(tabularDataDir,"OSFL_uncut5.rds") # Path to ECCC m0 model for OSFL
@@ -58,6 +58,16 @@ MeanTcut <- 10.74684
 SDTcut <- 10.19146
 MeanCutSz <- 51.59121
 SDCutSz <- 33.01943
+
+      # Coefficients
+m0_ModSevMPB1_mean <- summary(m0)$coefficients[2,1]
+m0_ModSevMPB1_se <- summary(m0)$coefficients[2,2]
+
+m1_Cut_size_sc_mean <- summary(m1)$coefficients[2,1]
+m1_Cut_size_sc_se <- summary(m1)$coefficients[2,2]
+
+m1_T_cut_sc_sq_mean <- summary(m1)$coefficients[4,1]
+m1_T_cut_sc_sq_se <- summary(m1)$coefficients[4,2]
 
 # ST-Sim outputs @ Project level
       # SQLite connection
@@ -111,10 +121,32 @@ for(scenarioId in scenarioIds){
   mask[] <- as.numeric(mask[])
   mask[!is.na(mask)] <- 0
   
+  # Define statistical models to be used for each iteration
+  m0_list <- list()
+  m1_list <- list()
+  
+  for(it in 1:nIterations){
+    # m0
+    m0_it <- m0
+    m0_it@beta[2] <- rnorm(1, mean = m0_ModSevMPB1_mean, sd = m0_ModSevMPB1_se)
+    m0_list <- c(m0_list, m0_it)
+    
+    # m1
+    m1_it <- m1
+    m1_it@beta[2] <- rnorm(1, mean = m1_Cut_size_sc_mean, sd = m1_Cut_size_sc_se)
+    m1_it@beta[4] <- rnorm(1, mean = m1_T_cut_sc_sq_mean, sd = m1_T_cut_sc_sq_se)
+    m1_list <- c(m1_list, m1_it)
+  }
+  rm(it, m0_it, m1_it)
+  
   for(ts in timeSteps){
     
     # Parallelize over iterations
     habitatSuitability_output <- foreach(it=1:nIterations, .packages=c('rsyncrosim', 'raster', 'tidyverse')) %dopar% {
+      # Grab statistical models corresponding to the iteration of interest
+      m0_it <- m0_list[[it]]
+      m1_it <- m1_list[[it]]
+      
       # ST-Sim outputs @ iteration | timestep level
             # Get rasters
       stateClass <- datasheetRaster(scenario, "stsim_OutputSpatialState", iteration=it, timestep=ts)
@@ -205,8 +237,8 @@ for(scenarioId in scenarioIds){
       df_habitatSuitability$preds <- ifelse(df_habitatSuitability$StateClass < 10, # If not forest, set habitat suitability to 0
                                             0,
                                             ifelse(df_habitatSuitability$Cut==1,
-                                                   predict(m1, newdata=df_habitatSuitability, type="response", allow.new.levels=T),
-                                                   predict(m0, newdata=df_habitatSuitability, type="response", allow.new.levels=T)))
+                                                   predict(m1_it, newdata=df_habitatSuitability, type="response", allow.new.levels=T),
+                                                   predict(m0_it, newdata=df_habitatSuitability, type="response", allow.new.levels=T)))
       
             # Create Habitat Suitability raster
       habitatSuitability <- mask
