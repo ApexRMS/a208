@@ -47,9 +47,6 @@ library_path <- paste0(resultsDir, "ssimLibrary/DawsonTSA.ssim.backup.2020-04-10
 m0_path <- paste0(tabularDataDir,"OSFL_uncut5.rds") # Path to ECCC m0 model for OSFL
 m1_path <- paste0(tabularDataDir,"OSFL_cut4.rds") # Path to ECCC m1 model for OSFL
 
-      # Tabular data
-subzoneID_path <- paste0(tabularDataDir, "BEC Subzone.xlsx") # Path to Primary Stratum labels
-
 #### Load Data ####
 # Statistical Models
       # Load models
@@ -81,10 +78,6 @@ saveDatasheet(project, stsim_StateAttributeType, "stsim_StateAttributeType")
 stsim_StateAttributeType <- datasheet(project, "stsim_StateAttributeType", includeKey = T)
 key <- stsim_StateAttributeType$StateAttributeTypeID[which(stsim_StateAttributeType$Name == 'OSFL Habitat')]
 
-# Tabular data
-subzoneID <- read.xlsx(subzoneID_path, sheet="Stratum") %>% # Load
-  mutate(Name = ifelse(Name == 'SBSwc', 'SBSwk', ifelse(Name == 'ESSFmv2', 'ESSFmv', ifelse(Name == 'BWBSwk1', 'BWBSwk', Name)))) # Correct errors in .xlsx file
-
 #### Create Cluster ####
 cl <- makeCluster(detectCores() - 1)
 registerDoParallel(cl)
@@ -112,6 +105,11 @@ for(scenarioId in scenarioIds){
         # Inputs - Get keys
   keys_primaryStratum <- datasheet(scenario, name = "stsim_Stratum", includeKey = T)
   keys_secondaryStratum <- datasheet(scenario, name = "stsim_SecondaryStratum", includeKey = T)
+  
+  # Create empty raster
+  mask <- datasheetRaster(scenario, "stsim_OutputSpatialState", iteration=1, timestep=timeSteps[1])
+  mask[] <- as.numeric(mask[])
+  mask[!is.na(mask)] <- 0
   
   for(ts in timeSteps){
     
@@ -264,7 +262,7 @@ for(scenarioId in scenarioIds){
                        Timestep = ts,
                        StateAttributeTypeID = key,
                        Filename = filename)
-        
+    
                       # Save
     dbWriteTable(conn=db, name="stsim_OutputSpatialStateAttribute", value=data, append=T, row.names=F)
     
