@@ -1,2 +1,2 @@
 # a208
-ECCC OSFL Habitat Model: Code used to prepare input data, run habitat models on landscape projections and prepare result plots and maps
+OSFL Habitat Model: Code used to prepare input data, run habitat models on ST-Sim landscape projections and prepare result plots and maps.
