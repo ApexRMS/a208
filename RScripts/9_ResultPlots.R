@@ -1,3 +1,9 @@
+#### a208: ECCC Olive Sided Fly Catcher Landscape Change and Habitat Model 
+#### Script by Leonardo Frid
+
+#### 9. Simulation result plots and maps for OSFL habitat change and occurence
+####    probability.
+
 library(rsyncrosim)
 library(dplyr)
 library(ggplot2)
