@@ -32,16 +32,15 @@ Sys.setenv(TZ='GMT')
 options(stringsAsFactors=FALSE, SHAPE_RESTORE_SHX=T, useFancyQuotes = F, digits=10)
 
 # Directories
-spatialDataDir <- "E:/a208/Data/Spatial/"
-tabularDataDir <- "E:/a208/Data/Tabular/"
-resultsDir <- "E:/a208/Results/"
+tabularDataDir <- "D:/a208/Data/Tabular/"
+# resultsDir <- "D:/a208/Results/"
 
 # Input Parameters
-scenarioIds <- c(30) # Can be one or multiple Scenario IDs
+scenarioIds <- c(46) # Can be one or multiple Scenario IDs
 
 # File Paths
       # ST-Sim library
-library_path <- paste0(resultsDir, "ssimLibrary/DawsonTSA.ssim.backup.2020-04-10-at-16-57-26_CD_2020.06.11/DawsonTSA.ssim") # Path to ST-Sim library
+library_path <- "D:/A208/ssimLibrary/DawsonTSA.ssim"
 
       # Statistical models
 m0_path <- paste0(tabularDataDir,"OSFL_uncut5.rds") # Path to ECCC m0 model for OSFL
@@ -80,16 +79,17 @@ library <- ssimLibrary(library_path)
 project <- rsyncrosim::project(library, project=1)
 
       # Add "OSFL Habitat" state attribute type
-stsim_StateAttributeType <- datasheet(project, "stsim_StateAttributeType")
-stsim_StateAttributeType <- addRow(stsim_StateAttributeType, 'OSFL Habitat')
-saveDatasheet(project, stsim_StateAttributeType, "stsim_StateAttributeType")
+# stsim_StateAttributeType <- datasheet(project, "stsim_StateAttributeType")
+# stsim_StateAttributeType <- addRow(stsim_StateAttributeType, 'OSFL Habitat')
+# saveDatasheet(project, stsim_StateAttributeType, "stsim_StateAttributeType")
 
       # Get "OSFL Habitat" key
 stsim_StateAttributeType <- datasheet(project, "stsim_StateAttributeType", includeKey = T)
 key <- stsim_StateAttributeType$StateAttributeTypeID[which(stsim_StateAttributeType$Name == 'OSFL Habitat')]
 
 #### Create Cluster ####
-cl <- makeCluster(detectCores() - 1)
+#cl <- makeCluster(detectCores() - 1)
+cl <- makeCluster(50)
 registerDoParallel(cl)
 
 #### Habitat Suitability Analysis ####
@@ -99,6 +99,7 @@ for(scenarioId in scenarioIds){
   scenario <- scenario(library, scenario = scenarioId)
   
         # Run Control information
+  #nIterations <- 100
   nIterations <- datasheet(scenario, "stsim_RunControl") %>% .$MaximumIteration
   minTime <- datasheet(scenario, "stsim_RunControl") %>% .$MinimumTimestep  
   maxTime <- datasheet(scenario, "stsim_RunControl") %>% .$MaximumTimestep
@@ -141,37 +142,50 @@ for(scenarioId in scenarioIds){
   
   for(ts in timeSteps){
     
+    # Get stateClass and forestAge rasters for each iteration
+    stateClass_list <- list()
+    forestAge_list <- list()
+    
+    for(it in 1:nIterations){
+      stateClass <- datasheetRaster(scenario, "stsim_OutputSpatialState", iteration=it, timestep=ts)
+      stateClass_list <- c(stateClass_list, stateClass)
+      
+      forestAge <- datasheetRaster(scenario, "stsim_OutputSpatialAge", iteration=it, timestep=ts)
+      forestAge_list <- c(forestAge_list, forestAge)
+    }
+    rm(it, stateClass, forestAge)
+    
     # Parallelize over iterations
     habitatSuitability_output <- foreach(it=1:nIterations, .packages=c('rsyncrosim', 'raster', 'tidyverse')) %dopar% {
       # Grab statistical models corresponding to the iteration of interest
       m0_it <- m0_list[[it]]
       m1_it <- m1_list[[it]]
-      
+
       # ST-Sim outputs @ iteration | timestep level
             # Get rasters
-      stateClass <- datasheetRaster(scenario, "stsim_OutputSpatialState", iteration=it, timestep=ts)
-      forestAge <- datasheetRaster(scenario, "stsim_OutputSpatialAge", iteration=it, timestep=ts)
-      
+      stateClass <- stateClass_list[[it]]
+      forestAge <- forestAge_list[[it]]
+
             # Convert rasters to integer
       stateClass[] <- as.integer(stateClass[])
       forestAge[] <- as.integer(forestAge[])
-      
+
       # Habitat Suitability - Prepare inputs
             # Produce "Cuts" raster (1 if area was cut; 0 otherwise)
       reclassRules <- matrix(c(2, 0, 3, 0, 5, 0, 6, 0, 7, 0, 9, 0, 10, 0, 11, 0, 12, 1, 13, 0, 14, 1), ncol=2, byrow=T)
       cuts <- reclassify(x=stateClass, rcl=reclassRules)
       cuts[] <- as.integer(cuts[])
-      
+
             # Prodice "MPB" raster (1 if area experienced moderate, severe, or very severe MPB; 0 otherwise)
       reclassRules <- matrix(c(2, 0, 3, 0, 5, 0, 6, 0, 7, 0, 9, 0, 10, 0, 11, 1, 12, 0, 13, 0, 14, 0), ncol=2, byrow=T)
       MPB <- reclassify(x=stateClass, rcl=reclassRules)
       MPB[] <- as.integer(MPB[])
-      
+
             # Produce "Time-since-cut" raster
                   # Create empty raster
       timeSinceCut <- mask
       timeSinceCut[] <- NA
-      
+
                   # Compute new value for each cell
       df <- data.frame(Cut=cuts[], ForestAge=forestAge[]) %>%
         mutate(TimeSinceCut = ifelse(is.na(Cut),
@@ -181,70 +195,70 @@ for(scenarioId in scenarioIds){
                                             ifelse(ForestAge > 40,
                                                    40,
                                                    ForestAge))))
-      
+
                   # Populate empty raster
       timeSinceCut[] <- df$TimeSinceCut
-      
+
             # Produce "Cut size" raster
                   # Clump timeSinceCut raster
                         # Create empty raster
       cutIds <- cuts
       cutIds[] <- NA
-      
+
                         # Populate empty raster with cutIds
       uniqueAges <- sort(unique(timeSinceCut[]))
       for(age in uniqueAges){
         # Create raster for timeSinceCut = Age
         ageRaster <- setValues(raster(timeSinceCut), NA)
         ageRaster[timeSinceCut == age] <- 1
-        
+
         # Clump resulting raster
         cutIds_age <- clump(ageRaster, directions=8, gaps=F)
-        
+
         # Make sure cutIds are unique
         if(!age == uniqueAges[1]){
           cutIds_age <- cutIds_age + max(cutIds[], na.rm=T)
         }
-        
+
         # Add cutIds to emptyRaster
         cutIds <- merge(cutIds_age, cutIds, overlap=T)
       }
-      
+
                   # Compute cut sizes
       df_cutSizes <- as.data.frame(freq(cutIds)) %>%
         filter(!is.na(value)) %>%
         mutate(area_ha = count*res(cuts)[1]*res(cuts)[1]/10000) %>%
         dplyr::select(-count)
-      
+
                   # Create cut size raster
       cutSizes <- reclassify(cutIds, df_cutSizes)
-      
+
       # Habitat Suitability - Compute
             # Get input parameters
       df_habitatSuitability <- data.frame(StateClass = stateClass[], Cut = cuts[], ModSevMPB = MPB[], T_since_cut = timeSinceCut[], Cut_size_ha = cutSizes[], PCYear = 2025) %>%
         mutate(Cut = as.factor(Cut),
                PCYear = as.factor(PCYear),
                ModSevMPB = as.factor(ModSevMPB))
-      
+
             # Scale variables
       df_habitatSuitability$T_cut_sc <- ifelse(df_habitatSuitability$Cut==1, (df_habitatSuitability$T_since_cut - MeanTcut)/SDTcut, NA)
       df_habitatSuitability$Cut_size_sc <- ifelse(df_habitatSuitability$Cut==1, (df_habitatSuitability$Cut_size_ha - MeanCutSz)/SDCutSz,NA)
-      
+
             # Add quadratic effect for T_since_cut
       df_habitatSuitability$T_cut_sc_sq <- (df_habitatSuitability$T_cut_sc)^2
-      
+
             # Predict OSFL presence using m1 for cut sites and m0 for uncut sites
       df_habitatSuitability$preds <- ifelse(df_habitatSuitability$StateClass < 10, # If not forest, set habitat suitability to 0
                                             0,
                                             ifelse(df_habitatSuitability$Cut==1,
                                                    predict(m1_it, newdata=df_habitatSuitability, type="response", allow.new.levels=T),
                                                    predict(m0_it, newdata=df_habitatSuitability, type="response", allow.new.levels=T)))
-      
+
             # Create Habitat Suitability raster
       habitatSuitability <- mask
       habitatSuitability[] <- NA
       habitatSuitability[] <- df_habitatSuitability$preds
-      
+
             # Save
       return(habitatSuitability)
     }
@@ -314,9 +328,10 @@ for(scenarioId in scenarioIds){
     
                 # Save
     dbWriteTable(conn=db, name="stsim_OutputStateAttribute", value=df_stratumHabitat, append=T, row.names=F)
-    write.csv(df_stratumHabitat, paste0(resultsDir, "Tabular/OutputStateAttribute.csv"), row.names = F)
+    #write.csv(df_stratumHabitat, paste0(resultsDir, "Tabular/OutputStateAttribute.csv"), row.names = F)
     
     print(paste0("Scenario: ", scenarioId, "; Timestep: ", ts))
+    rm(df_habitatSuitability, df_habitatSuitability_avg, df_stratumHabitat, forestAge_list, stateClass_list, habitatSuitability, habitatSuitability_stack)
   }
 }
 
@@ -324,4 +339,4 @@ for(scenarioId in scenarioIds){
 stopCluster(cl)
 
 # Get total run time
-print(start_time - Sys.time())
+print(Sys.time() - start_time)
