@@ -10,6 +10,7 @@ library(ggplot2)
 library(stringr)
 library(raster)
 library(gridExtra)
+library(tidyr)
 
 myLib = ssimLibrary("D:/A208/ssimLibrary/DawsonTSA.ssim")
 myScenarios = scenario(myLib, results = T)
@@ -62,6 +63,7 @@ p <- p + geom_boxplot() + theme_classic() + labs(fill = "Scenario")  + ylab("Hab
   theme(legend.position="none") + geom_hline(yintercept=0, linetype = "dashed") +
   guides(alpha = FALSE)
 
+summarise(myOutputTotal, med = median(HabitatChange))
 
 ggsave("D:/A208/Results/Plots/HabitatChange.png", device = "png", width = 8.5, height = 8.5, units = "cm", dpi = 300)
 ggsave("D:/A208/Results/Plots/HabitatChange.pdf", device = "pdf", width = 8.5, height = 8.5, units = "cm", dpi = 300)
@@ -141,3 +143,31 @@ myPlotIC = levelplot(myStack2020, at=cuts, col.regions=cols,
 myFinalPlot = grid.arrange(myPlotIC, myPlot, ncol=2)
 
 ggsave("D:/A208/Results/Plots/Map.pdf", device = "pdf", width = 170, height = 8.5, units = "cm", dpi = 300)
+
+# Initial State Class #####################################
+initialStateClass = datasheetRaster(myLib, "InitialConditionsSpatial",
+                          scenario = c(3),
+                          column = "StateClassFileName")
+
+legend = datasheet(myLib, project = 1, name = "StateClass")
+initialStateClass <- as.factor(initialStateClass)
+rat <- levels(initialStateClass)[[1]]
+rat = left_join(rat, legend)
+
+rat$Color = substring(rat$Color,5)
+rat = separate(data = rat, col = Color, into = c("R", "G", "B"), sep = ",")
+rat$R = as.numeric(rat$R)
+rat$G = as.numeric(rat$G)
+rat$B = as.numeric(rat$B)
+
+library(ggtern)
+rat$Hex = rgb2hex(rat$R, rat$G, rat$B)
+
+plot(initialStateClass,col=rat$Hex,legend=F,box=F,axes=F)
+legend(x='bottomleft', legend =rat$Name,fill = rat$Hex)
+
+rat$level = rat$Name
+rat$level = gsub(":All", "", rat$level)
+levels(initialStateClass) = rat
+
+levelplot(initialStateClass, col.regions = rat$Hex, maxpixels = 3e6)
