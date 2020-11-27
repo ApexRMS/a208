@@ -11,6 +11,7 @@ library(stringr)
 library(raster)
 library(gridExtra)
 library(tidyr)
+library(forcats)
 
 myLib = ssimLibrary("D:/A208/ssimLibrary/DawsonTSA.ssim")
 myScenarios = scenario(myLib, results = T)
@@ -47,51 +48,120 @@ myOutput = full_join(myOutput, myOutput2050)
 
 myOutput$HabitatChange = myOutput$Year2050 - myOutput$Year2020
 
+# Define manual orders for factors
+orderParentName <- c("Business as Usual - Fire x 1.5",
+                     "Business as Usual",
+                     "Increased Protected Area - Fire x 1.5",
+                     "Increased Protected Area",
+                     "Reduced Cutblock Size - Fire x 1.5",
+                     "Reduced Cutblock Size")
+orderFire <- c("Increased Fire", "Baseline Fire")
+
 # Total Output
-myOutputTotal = group_by(myOutput,ParentName, Iteration) %>% summarise(Total2020 = sum(Year2020), Total2050 = sum(Year2050))
-myOutputTotal$HabitatChange = myOutputTotal$Total2050 - myOutputTotal$Total2020
-myOutputTotal$HabitatChange = (myOutputTotal$HabitatChange/myOutputTotal$Total2020)*100
-myOutputTotal$Management = gsub(" - Fire x 1.5", x = myOutputTotal$ParentName, replacement =  "")
-myOutputTotal$Fire = str_detect(myOutputTotal$ParentName, " - Fire x 1.5", negate = FALSE)
-myOutputTotal$Alpha = 1
-myOutputTotal$Alpha[myOutputTotal$Fire==FALSE] = 0.9
 
-p <- ggplot(myOutputTotal, aes(x = reorder(ParentName, HabitatChange, FUN = median), HabitatChange, fill = Management, alpha = Alpha))
-p <- p + geom_boxplot() + theme_classic() + labs(fill = "Scenario")  + ylab("Habitat Change (%)") + theme(axis.title.x=element_blank(),
-                                                          axis.text.x=element_blank(),
-                                                          axis.ticks.x=element_blank()) + 
-  theme(legend.position="none") + geom_hline(yintercept=0, linetype = "dashed") +
-  guides(alpha = FALSE)
+myOutputTotal <- group_by(myOutput,ParentName, Iteration) %>% 
+  summarise(Total2020 = sum(Year2020), Total2050 = sum(Year2050)) %>%
+  mutate(
+    HabitatChange = (Total2050 - Total2020) / Total2020 * 100,        # Change as a percentage
+    ParentName =    str_replace(ParentName, "Increase", "Increased"), # For consistency with S2, S3, Fig 4
+    ParentName =    str_replace(ParentName, "Reduce Clearcut", "Reduced Cutblock"), # For consistency with S2, S3, Fig 4
+    Management = str_replace(ParentName, " - Fire x 1.5", ""),
+    Fire = str_detect(ParentName, "Fire") %>% ifelse("Increased Fire", "Baseline Fire"),
+    # Recode as factors and reorder manually
+    ParentName = factor(ParentName, levels = orderParentName),
+    Fire = factor(Fire, levels = orderFire)
+  )
 
-summarise(myOutputTotal, med = median(HabitatChange))
+p <- myOutputTotal %>%
+  ggplot(aes(x = ParentName, y = HabitatChange, fill = Management, alpha = Fire)) +
+    geom_boxplot() +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    labs(fill = "Scenario", alpha = "", y = "Habitat Change (%)") +
+    scale_alpha_manual(values = c(1, 0.4)) +
+    theme_classic() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.x = element_blank(),
+      #legend.position = "none"
+    ) +
+    guides(
+      fill = guide_legend(order = 1),
+      alpha = guide_legend(override.aes = list(fill = "grey50", alpha = c(1, 0.4)))
+    )
 
-ggsave("D:/A208/Results/Plots/HabitatChange.png", device = "png", width = 8.5, height = 8.5, units = "cm", dpi = 300)
-ggsave("D:/A208/Results/Plots/HabitatChange.pdf", device = "pdf", width = 8.5, height = 8.5, units = "cm", dpi = 300)
+save_plot("D:/A208/Results/Plots/HabitatChange.pdf", p, base_width = 6, base_height = 4)
 
 # BEC Output
-myOutputTotal = group_by(myOutput,ParentName, Iteration, StratumID) %>% summarise(Total2020 = sum(Year2020), Total2050 = sum(Year2050))
-myOutputTotal$HabitatChange = myOutputTotal$Total2050 - myOutputTotal$Total2020
-myOutputTotal$HabitatChange = (myOutputTotal$HabitatChange/myOutputTotal$Total2020)*100
-myOutputTotal = filter(myOutputTotal, StratumID != "Wetland Open")
+myOutputTotalBEC <- group_by(myOutput,ParentName, Iteration, StratumID) %>% 
+  summarise(Total2020 = sum(Year2020), Total2050 = sum(Year2050)) %>%
+  filter(StratumID != "Wetland Open") %>%
+  mutate(
+    HabitatChange = (Total2050 - Total2020) / Total2020 * 100,        # Change as a percentage
+    ParentName =    str_replace(ParentName, "Increase", "Increased"), # For consistency with S2, S3, Fig 4
+    ParentName =    str_replace(ParentName, "Reduce Clearcut", "Reduced Cutblock"), # For consistency with S2, S3, Fig 4
+    Management = str_replace(ParentName, " - Fire x 1.5", ""),
+    Fire = str_detect(ParentName, "Fire") %>% ifelse("Increased Fire", "Baseline Fire"),
+    # Recode as factors and reorder manually
+    ParentName = factor(ParentName, levels = orderParentName),
+    Fire = factor(Fire, levels = orderFire)
+  )
 
-p <- ggplot(myOutputTotal, aes(ParentName, HabitatChange, fill = ParentName))
-p + geom_boxplot() + theme(legend.position="top") + theme_classic() + labs(fill = "Scenario")  + ylab("Habitat Change (%)") + theme(axis.title.x=element_blank(),
-                                                                                                                                    axis.text.x=element_blank(),
-                                                                                                                                    axis.ticks.x=element_blank()) +
-  facet_wrap("StratumID", ncol = 3) + geom_hline(yintercept=0)
+pBEC <- myOutputTotalBEC %>%
+  ggplot(aes(x = ParentName, y = HabitatChange, fill = Management, alpha = Fire)) +
+  geom_boxplot(lwd = 0.1, outlier.size = 0.8) + # Thinner boxplot lines to make fills more visible
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~ StratumID) +
+  labs(fill = "Scenario", alpha = "", y = "Habitat Change (%)") +
+  scale_alpha_manual(values = c(1, 0.4)) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x = element_blank(),
+    #legend.position = "none"
+  ) +
+  guides(
+    fill = guide_legend(order = 1),
+    alpha = guide_legend(override.aes = list(fill = "grey50", alpha = c(1, 0.4)))
+  )
 
-# Ownership Output
-myOutputTotal = group_by(myOutput,ParentName, Iteration, SecondaryStratumID) %>% summarise(Total2020 = sum(Year2020), Total2050 = sum(Year2050))
-myOutputTotal$HabitatChange = myOutputTotal$Total2050 - myOutputTotal$Total2020
-myOutputTotal$HabitatChange = (myOutputTotal$HabitatChange/myOutputTotal$Total2020)*100
+save_plot("D:/A208/Results/Plots/S2-BEC.pdf", pBEC, base_width = 6, base_height = 4.5)
 
+# Ownership Output (Owner)
+myOutputTotalOwner <- group_by(myOutput,ParentName, Iteration, SecondaryStratumID) %>% 
+  summarise(Total2020 = sum(Year2020), Total2050 = sum(Year2050)) %>%
+  mutate(
+    HabitatChange = (Total2050 - Total2020) / Total2020 * 100,        # Change as a percentage
+    ParentName =    str_replace(ParentName, "Increase", "Increased"), # For consistency with S2, S3, Fig 4
+    ParentName =    str_replace(ParentName, "Reduce Clearcut", "Reduced Cutblock"), # For consistency with S2, S3, Fig 4
+    Management = str_replace(ParentName, " - Fire x 1.5", ""),
+    Fire = str_detect(ParentName, "Fire") %>% ifelse("Increased Fire", "Baseline Fire"),
+    # Recode as factors and reorder manually
+    ParentName = factor(ParentName, levels = orderParentName),
+    Fire = factor(Fire, levels = orderFire)
+  )
 
-p <- ggplot(myOutputTotal, aes(ParentName, HabitatChange, fill = ParentName))
-p + geom_boxplot() + theme(legend.position="top") + theme_classic() + labs(fill = "Scenario")  + ylab("Habitat Change (%)") + theme(axis.title.x=element_blank(),
-                                                                                                                                    axis.text.x=element_blank(),
-                                                                                                                                    axis.ticks.x=element_blank()) +
-  facet_wrap("SecondaryStratumID", ncol = 3) + geom_hline(yintercept=0)
+pOwner <- myOutputTotalOwner %>%
+  ggplot(aes(x = ParentName, y = HabitatChange, fill = Management, alpha = Fire)) +
+  geom_boxplot(lwd = 0.1) + # Thinner boxplot lines to make fills more visible
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~ SecondaryStratumID) +
+  labs(fill = "Scenario", alpha = "", y = "Habitat Change (%)") +
+  scale_alpha_manual(values = c(1, 0.4)) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x = element_blank(),
+    #legend.position = "none"
+  ) +
+  guides(
+    fill = guide_legend(order = 1),
+    alpha = guide_legend(override.aes = list(fill = "grey50", alpha = c(1, 0.4)))
+  )
 
+save_plot("D:/A208/Results/Plots/S3-Ownership.pdf", pOwner, base_width = 6, base_height = 3)
 
 # Spatial Output -----------------------
 
@@ -103,26 +173,19 @@ myStack = datasheetRaster(myLib, "OutputSpatialStateAttribute",
 
 library(RColorBrewer)
 library(rasterVis)
+library(cowplot)
 
-myStack2050 = subset(myStack, c(2,4,6,8,10,12))
+myStack2050 = subset(myStack, c(2,6,4,8,12,10))
 myStack2020 = subset(myStack, c(1))
 
-names(myStack2050)
-rasterNames  <- gsub("sa_161.it1.ts20","20", names(myStack2050))
-rasterNames  <- gsub("scn38.","BAU ", rasterNames)
-rasterNames  <- gsub("scn39.","Reduce Cut Size ", rasterNames)
-rasterNames  <- gsub("scn45.","30% Protection ", rasterNames)
-rasterNames  <- gsub("scn43.","BAU, Fire x1.5 ", rasterNames)
-rasterNames  <- gsub("scn44.","Reduce Cut Size, Fire x1.5 ", rasterNames)
-rasterNames  <- gsub("scn46.","30% Protection, Fire x1.5 ", rasterNames)
-rasterNames  <- gsub("BAU 2020","Year 2020", rasterNames)
-rasterNames  <- gsub("BAU 2050","BAU", rasterNames)
-rasterNames  <- gsub("30% Protection 2050","30% Protection", rasterNames)
-rasterNames  <- gsub("Reduce Cut Size 2050","Reduce Cut Size", rasterNames)
-rasterNames  <- gsub("BAU, Fire x1.5 2050","", rasterNames)
-rasterNames  <- gsub("Reduce Cut Size, Fire x1.5 2050","", rasterNames)
-rasterNames  <- gsub("30% Protection, Fire x1.5 2050","", rasterNames)
-rasterNames[5] = "Increased Fire"
+rasterNames <- names(myStack2050) %>%
+  str_replace("sa_161.it1.ts20","20") %>%                   # Remove time step, iteration info
+  str_replace("scn38.","Business as Usual ") %>%
+  str_replace("scn39.","Reduced Cutblock Size ") %>%
+  str_replace("scn45.","Increased Protected Areas ") %>%
+  str_replace("scn43.","Business as Usual, Fire x1.5 ") %>%
+  str_replace("scn44.","Reduced Cutblock Size, Fire x1.5 ") %>%
+  str_replace("scn46.","Increased Protected Areas, Fire x1.5 ")
 
 cuts=c(0,0.02,0.025,0.03,0.06,0.2,0.3) #set breaks
 
@@ -132,17 +195,39 @@ cuts=c(0,0.02,0.025,0.03,0.06,0.2,0.3) #set breaks
 cols <- colorRampPalette(brewer.pal(5,"PRGn"))
 myPlot = levelplot(myStack2050, at=cuts, col.regions=cols,
           layout=c(3, 2),
-          names.attr=rasterNames,
+          names.attr= rep("", 6), # Replace `rep(...)` with `rasterNames` to ensure plots are labeled correctly further down
           xlab = NULL, ylab = NULL, scales=list(draw=FALSE),
-          labels=list(at=cuts, labels=round(cuts, 2))) #plot with defined breaks
+          labels=list(at=cuts, labels=round(cuts, 2))) # plot with defined breaks
 myPlotIC = levelplot(myStack2020, at=cuts, col.regions=cols,
                    layout=c(1, 1), colorkey=FALSE,
                    names.attr=c("2020"), margin = F,
                    labels=list(at=cuts, labels=round(cuts, 2))) #plot with defined breaks
 
-myFinalPlot = grid.arrange(myPlotIC, myPlot, ncol=2)
+annotatedGrid <- ggdraw(myPlot) +
+  draw_label("Business\nas Usual",         x = 0.18, y = 0.95, size = 12) +
+  draw_label("Increased\nProtected Areas", x = 0.44, y = 0.95, size = 12) +
+  draw_label("Reduced\nCutblock Size",     x = 0.69, y = 0.95, size = 12) +
+  draw_label("Baseline Fire",  angle = 90, x = 0.04, y = 0.69, size = 12) +
+  draw_label("Increased Fire", angle = 90, x = 0.04, y = 0.25, size = 12)
 
-ggsave("D:/A208/Results/Plots/Map.pdf", device = "pdf", width = 170, height = 8.5, units = "cm", dpi = 300)
+S4 <- plot_grid(
+  myPlotIC,
+  annotatedGrid,
+  rel_widths = c(5, 7.3),
+  labels = c("Occurrence Probability 2020", "Occurrence Probability 2050"),
+  label_size = 12,
+  label_x = c(-0.08, 0),
+  label_y = 1.1
+)
+
+S4Padded <- plot_grid(
+  NULL, #Empty space above
+  S4,
+  rel_heights = c(0.1, 1),
+  nrow = 2
+)
+
+save_plot("D:/A208/Results/Plots/S4-Map.pdf", S4Padded, base_height = 4, base_width = 8, dpi = 450)
 
 # Initial State Class #####################################
 initialStateClass = datasheetRaster(myLib, "InitialConditionsSpatial",
