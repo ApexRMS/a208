@@ -13,7 +13,7 @@ library(gridExtra)
 library(tidyr)
 library(forcats)
 
-myLib = ssimLibrary("D:/A208/ssimLibrary/DawsonTSA.ssim")
+myLib = ssimLibrary("D:/A208/DawsonTSA.ssim")
 myScenarios = scenario(myLib, results = T)
 
 # Non-Spatial Output ---------------------------------------------------------
@@ -46,6 +46,17 @@ myOutput = full_join(myOutput2020,myOutput2030)
 myOutput = full_join(myOutput, myOutput2040)
 myOutput = full_join(myOutput, myOutput2050)
 
+# Calculate mean and variation for by Scenario in 2020 ---------
+myOutput2020Only <- group_by(myOutput,ParentName, Iteration) %>% 
+  summarise(Total2020 = sum(Year2020))
+
+myInitialHabitatStats <- group_by(myOutput2020Only,ParentName) %>% 
+  summarise(Mean = mean(Total2020), Median = median(Total2020), LCI = quantile(Total2020, 0.025), UCI = quantile(Total2020, 0.975))
+
+write.csv(myInitialHabitatStats, "InitialHabitatStats.csv")
+
+
+# Create a plot of Habitat Change --------------------------------
 myOutput$HabitatChange = myOutput$Year2050 - myOutput$Year2020
 
 # Define manual orders for factors
@@ -162,6 +173,27 @@ pOwner <- myOutputTotalOwner %>%
   )
 
 save_plot("D:/A208/Results/Plots/S3-Ownership.pdf", pOwner, base_width = 6, base_height = 3)
+
+# Cumulative area burned and cut --------------------------------------------
+
+transitionArea <- datasheet(myLib, 
+                            name = "OutputStratumTransition", 
+                            scenario = c(38,39,43,44,45,46), 
+                            fastQuery = T)
+
+clearCutBurnArea <-filter(transitionArea, 
+                          TransitionGroupID %in% 
+                            c("Disturbance: Clearcut [Type]", 
+                              "Disturbance: Fire [Type]"))
+
+
+myClearCutBurnTotal <- group_by(clearCutBurnArea,ParentName, Iteration) %>% 
+  summarise(Total = sum(Amount))
+
+myClearCutBurnStats <- group_by(myClearCutBurnTotal,ParentName) %>% 
+  summarise(Mean = mean(Total), Median = median(Total), LCI = quantile(Total, 0.025), UCI = quantile(Total, 0.975))
+
+write.csv(myClearCutBurnStats, "clearcutBurnStats.csv")
 
 # Spatial Output -----------------------
 
