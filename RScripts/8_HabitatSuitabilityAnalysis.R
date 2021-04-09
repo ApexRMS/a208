@@ -24,6 +24,7 @@ library(stringr)
 library(openxlsx)
 library(rsyncrosim)
 library(raster)
+library(rgdal)
 library(blme)
 library(doParallel)
 
@@ -32,15 +33,15 @@ Sys.setenv(TZ='GMT')
 options(stringsAsFactors=FALSE, SHAPE_RESTORE_SHX=T, useFancyQuotes = F, digits=10)
 
 # Directories
-tabularDataDir <- "D:/a208/Data/Tabular/"
+tabularDataDir <- "D:/osfl/Data/Tabular/"
 # resultsDir <- "D:/a208/Results/"
 
 # Input Parameters
-scenarioIds <- c(46) # Can be one or multiple Scenario IDs
+scenarioIds <- c(54,55,56,57,59,58) # Can be one or multiple Scenario IDs
 
 # File Paths
       # ST-Sim library
-library_path <- "D:/A208/ssimLibrary/DawsonTSA.ssim"
+library_path <- "D:/osfl/Results/ssimLibrary/DawsonTSA.ssim"
 
       # Statistical models
 m0_path <- paste0(tabularDataDir,"OSFL_uncut5.rds") # Path to ECCC m0 model for OSFL
@@ -319,7 +320,7 @@ for(scenarioId in scenarioIds){
       gather(., key="Iteration", value="HabitatSuitability", -c('StratumID', 'SecondaryStratumID')) %>%
       mutate(Iteration = substr(Iteration, start=2, stop=nchar(Iteration))) %>%
       group_by(StratumID, SecondaryStratumID, Iteration) %>%
-      summarize(Amount = sum(HabitatSuitability)) %>%
+      summarize(Amount = sum(HabitatSuitability)*0.81) %>%
       ungroup() %>%
       mutate(ScenarioID = scenarioId, Timestep = ts, StateAttributeTypeID = key) %>%
       dplyr::select(ScenarioID, Iteration, Timestep, StratumID, SecondaryStratumID, StateAttributeTypeID, Amount)
