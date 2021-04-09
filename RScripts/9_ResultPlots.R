@@ -12,12 +12,14 @@ library(raster)
 library(gridExtra)
 library(tidyr)
 library(forcats)
+library(cowplot)
 
-myLib = ssimLibrary("D:/A208/DawsonTSA.ssim")
+myLib = ssimLibrary("D:/osfl/Results/ssimLibrary/DawsonTSA.ssim")
 myScenarios = scenario(myLib, results = T)
+myScenarios
 
 # Non-Spatial Output ---------------------------------------------------------
-myHabitatOutput = datasheet(myLib, name = "OutputStateAttribute", scenario = c(38,39,43,44,45,46))
+myHabitatOutput = datasheet(myLib, name = "OutputStateAttribute", scenario = c(54,55,56,57,59,58))
 
 #2020
 ts = 2020
@@ -49,6 +51,8 @@ myOutput = full_join(myOutput, myOutput2050)
 # Calculate mean and variation for by Scenario in 2020 ---------
 myOutput2020Only <- group_by(myOutput,ParentName, Iteration) %>% 
   summarise(Total2020 = sum(Year2020))
+
+write.csv(myOutput2020Only, "Habitat2020.csv")
 
 myInitialHabitatStats <- group_by(myOutput2020Only,ParentName) %>% 
   summarise(Mean = mean(Total2020), Median = median(Total2020), LCI = quantile(Total2020, 0.025), UCI = quantile(Total2020, 0.975))
@@ -101,7 +105,12 @@ p <- myOutputTotal %>%
       alpha = guide_legend(override.aes = list(fill = "grey50", alpha = c(1, 0.4)))
     )
 
-save_plot("D:/A208/Results/Plots/HabitatChange.pdf", p, base_width = 6, base_height = 4)
+save_plot("D:/osfl/Results/Plots/HabitatChange.pdf", p, base_width = 6, base_height = 4)
+
+myOutputTotalSummary <- group_by(myOutputTotal,ParentName) %>% 
+  summarise(Mean = mean(HabitatChange), Median = median(HabitatChange), LCI = quantile(HabitatChange, 0.25), UCI = quantile(HabitatChange, 0.75))
+
+write.csv(myOutputTotalSummary, "HabitatChange.csv")
 
 # BEC Output
 myOutputTotalBEC <- group_by(myOutput,ParentName, Iteration, StratumID) %>% 
@@ -137,7 +146,7 @@ pBEC <- myOutputTotalBEC %>%
     alpha = guide_legend(override.aes = list(fill = "grey50", alpha = c(1, 0.4)))
   )
 
-save_plot("D:/A208/Results/Plots/S2-BEC.pdf", pBEC, base_width = 6, base_height = 4.5)
+save_plot("D:/osfl/Results/Plots/S2-BEC.pdf", pBEC, base_width = 6, base_height = 4.5)
 
 # Ownership Output (Owner)
 myOutputTotalOwner <- group_by(myOutput,ParentName, Iteration, SecondaryStratumID) %>% 
@@ -172,13 +181,13 @@ pOwner <- myOutputTotalOwner %>%
     alpha = guide_legend(override.aes = list(fill = "grey50", alpha = c(1, 0.4)))
   )
 
-save_plot("D:/A208/Results/Plots/S3-Ownership.pdf", pOwner, base_width = 6, base_height = 3)
+save_plot("D:/osfl/Results/Plots/S3-Ownership.pdf", pOwner, base_width = 6, base_height = 3)
 
 # Cumulative area burned and cut --------------------------------------------
 
 transitionArea <- datasheet(myLib, 
                             name = "OutputStratumTransition", 
-                            scenario = c(38,39,43,44,45,46), 
+                            scenario = c(54,55,56,57,59,58), 
                             fastQuery = T)
 
 clearCutBurnArea <-filter(transitionArea, 
@@ -198,26 +207,26 @@ write.csv(myClearCutBurnStats, "clearcutBurnStats.csv")
 # Spatial Output -----------------------
 
 myStack = datasheetRaster(myLib, "OutputSpatialStateAttribute",
-                scenario = c(38,39,45,43,44,46),
+                scenario = c(54,55,56,57,59,58),
                 timestep = c(2020,2050),
                 iteration = 1,
                 subset = expression(grepl("sa_161", Filename, fixed = TRUE)))
 
 library(RColorBrewer)
 library(rasterVis)
-library(cowplot)
 
-myStack2050 = subset(myStack, c(2,6,4,8,12,10))
+
+myStack2050 = subset(myStack, c(2,4,6,8,10,12))
 myStack2020 = subset(myStack, c(1))
 
 rasterNames <- names(myStack2050) %>%
   str_replace("sa_161.it1.ts20","20") %>%                   # Remove time step, iteration info
-  str_replace("scn38.","Business as Usual ") %>%
-  str_replace("scn39.","Reduced Cutblock Size ") %>%
-  str_replace("scn45.","Increased Protected Areas ") %>%
-  str_replace("scn43.","Business as Usual, Fire x1.5 ") %>%
-  str_replace("scn44.","Reduced Cutblock Size, Fire x1.5 ") %>%
-  str_replace("scn46.","Increased Protected Areas, Fire x1.5 ")
+  str_replace("scn54.","Business as Usual ") %>%
+  str_replace("scn56.","Reduced Cutblock Size ") %>%
+  str_replace("scn55.","Increased Protected Areas ") %>%
+  str_replace("scn57.","Business as Usual, Fire x1.5 ") %>%
+  str_replace("scn58.","Reduced Cutblock Size, Fire x1.5 ") %>%
+  str_replace("scn59.","Increased Protected Areas, Fire x1.5 ")
 
 cuts=c(0,0.02,0.025,0.03,0.06,0.2,0.3) #set breaks
 
@@ -259,7 +268,7 @@ S4Padded <- plot_grid(
   nrow = 2
 )
 
-save_plot("D:/A208/Results/Plots/S4-Map.pdf", S4Padded, base_height = 4, base_width = 8, dpi = 450)
+save_plot("D:/osfl/Results/Plots/S4-Map.pdf", S4Padded, base_height = 4, base_width = 8, dpi = 450)
 
 # Initial State Class #####################################
 initialStateClass = datasheetRaster(myLib, "InitialConditionsSpatial",
@@ -272,7 +281,7 @@ rat <- levels(initialStateClass)[[1]]
 rat = left_join(rat, legend)
 
 rat$Color = substring(rat$Color,5)
-rat = separate(data = rat, col = Color, into = c("R", "G", "B"), sep = ",")
+rat = tidyr::separate(data = rat, col = Color, into = c("R", "G", "B"), sep = ",")
 rat$R = as.numeric(rat$R)
 rat$G = as.numeric(rat$G)
 rat$B = as.numeric(rat$B)
@@ -287,4 +296,5 @@ rat$level = rat$Name
 rat$level = gsub(":All", "", rat$level)
 levels(initialStateClass) = rat
 
-levelplot(initialStateClass, col.regions = rat$Hex, maxpixels = 3e6)
+initialState <- levelplot(initialStateClass, col.regions = rat$Hex, maxpixels = 3e6)
+
